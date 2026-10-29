@@ -48,13 +48,28 @@ export function lastLogFor(exerciseId) {
   return null;
 }
 
+// Rutinas guardadas (se guarda el plan sin la línea de tiempo; se reconstruye al usarla)
+const KEY_ROUTINES = "wa.routines.v1";
+export function getRoutines() { return read(KEY_ROUTINES, []); }
+export function saveRoutine(plan, meta = {}) {
+  const { steps, totalSec, ...rest } = plan;
+  const r = { id: `rt-${Date.now().toString(36)}`, guardada: new Date().toISOString(), estrellas: 0, carpeta: "", comentario: "",
+    nombre: meta.nombre ?? "", ...meta, plan: rest, duracionSeg: totalSec };
+  const list = getRoutines(); list.unshift(r); write(KEY_ROUTINES, list); return r;
+}
+export function updateRoutine(id, patch) {
+  const list = getRoutines().map(r => r.id === id ? { ...r, ...patch } : r); write(KEY_ROUTINES, list); return list;
+}
+export function deleteRoutine(id) { const list = getRoutines().filter(r => r.id !== id); write(KEY_ROUTINES, list); return list; }
+
 export function exportData() {
   return JSON.stringify({ app: "workout-app", schema: SCHEMA_VERSION, exportado: new Date().toISOString(),
-    ajustes: read(KEY_SETTINGS, {}), historial: getHistory() }, null, 2);
+    ajustes: read(KEY_SETTINGS, {}), historial: getHistory(), rutinas: read("wa.routines.v1", []) }, null, 2);
 }
 export function importData(text) {
   const data = JSON.parse(text);
   if (data.app !== "workout-app") throw new Error("El archivo no es una copia de esta app.");
   if (data.ajustes) write(KEY_SETTINGS, data.ajustes);
   if (Array.isArray(data.historial)) write(KEY_HISTORY, data.historial);
+  if (Array.isArray(data.rutinas)) write("wa.routines.v1", data.rutinas);
 }

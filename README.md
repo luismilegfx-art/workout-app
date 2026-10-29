@@ -4,10 +4,17 @@ Aplicación de entrenamiento guiado por tiempo. Genera rutinas al instante segú
 
 **En línea:** https://luismilegfx-art.github.io/workout-app/
 
+## Secciones
+
+Progreso (inicio) · Rutinas · **Entrenar** · Biblioteca · Perfil
+
 ## Funciones
 
-- Generador por enfoque (Push, Pull, Piernas, Core, Cuerpo completo, Tren superior y grupos específicos), lugar y tiempo.
-- Énfasis por sesión (fuerza, masa, condición) con rotación automática según el historial.
+- Flujo de Entrenar paso a paso: lugar (con preset de equipo en casa) → zona en una figura anatómica con subzonas y prioridades → tiempo → énfasis.
+- Generador por zonas y subzonas: las prioritarias reciben más ejercicios, varía ángulos y agarres, nunca sale de lo escogido.
+- Énfasis por sesión: Fuerza, Músculo o Resistencia.
+- Progreso: semana actual frente a la meta, constancia, calendario y sesiones recientes.
+- Rutinas guardadas con estrellas, carpetas y comentarios.
 - Sesiones exprés: un solo grupo muscular, ejercicios encadenados.
 - Reproductor a pantalla completa: voz en español, pitidos de cuenta regresiva, cambio de lado en unilaterales, pausa, saltar, +15 s de descanso y cambio de ejercicio en vivo.
 - Registro de sesión: repeticiones, peso (lb), esfuerzo (RIR) y molestias. Los ejercicios con molestia dejan de proponerse.
@@ -25,7 +32,8 @@ js/data/catalog.js    Enfoques, grupos, equipo y parámetros iniciales
 js/engine/generator.js  Generador y distribución del tiempo (función pura, con semilla)
 js/engine/runner.js     Ejecución por marcas de tiempo
 js/engine/voice.js      Voz y pitidos
-js/ui/                  Pantallas
+js/data/body-paths.js   Trazos de la figura anatómica (MIT, ver third_party/)
+js/ui/                  Pantallas (progress, routines, train, body-map, preview, player, summary, library, profile)
 prototipos/             Pruebas técnicas (detección de pose con cámara)
 tests/                  Pruebas del generador
 ```

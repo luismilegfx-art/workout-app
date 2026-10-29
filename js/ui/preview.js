@@ -1,14 +1,22 @@
-// Vista previa de la rutina generada: revisar, cambiar ejercicios, regenerar o empezar.
+// Vista previa de la rutina: revisar, cambiar ejercicios, regenerar, guardar o empezar.
 import { html, mount, fmtMin, toast } from "./dom.js";
-import { FOCUSES, EMPHASES, MUSCLES } from "../data/catalog.js";
+import { EMPHASES, ZONES, PRESETS } from "../data/catalog.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
-import { generateRoutine, swapExercise, buildSteps } from "../engine/generator.js";
+import { generateRoutine, swapExercise, buildSteps, blockTitle, sumSteps } from "../engine/generator.js";
 import { techCard } from "./technique.js";
-import { lastLogFor } from "../store.js";
+import { lastLogFor, saveRoutine } from "../store.js";
 
 const open = new Set();
 
-function emphasisLabel(plan) { return plan.expres ? "Exprés" : EMPHASES[plan.enfasis]?.nombre ?? plan.enfasis; }
+export function planLabel(plan) {
+  const zonas = plan.zonas ?? {};
+  const norm = s => JSON.stringify(Object.keys(s).filter(z => s[z]?.length).sort().map(z => [z, [...s[z]].sort()]));
+  const preset = Object.values(PRESETS).find(p => norm(p.sel) === norm(zonas));
+  return preset ? preset.nombre : Object.keys(zonas).map(z => ZONES[z]?.nombre).filter(Boolean).join(", ") || "Rutina";
+}
+export const emphasisLabel = plan => plan.expres ? "Exprés" : EMPHASES[plan.enfasis]?.nombre ?? plan.enfasis;
+export const placeLabel = (plan, settings) => plan.lugar === "gym" ? "Gimnasio"
+  : `Casa${plan.preset ? ` · ${settings.presetsEquipo.find(p => p.id === plan.preset)?.nombre ?? ""}` : ""}`;
 
 export function renderPreview(view, app) {
   const plan = app.plan;
@@ -33,12 +41,13 @@ export function renderPreview(view, app) {
   mount(view, html`
     <div class="spread">
       <div class="stack" style="gap:4px">
-        <span class="label">${FOCUSES[plan.enfoque]?.nombre} · ${plan.lugar === "gym" ? "Gimnasio" : "Casa"}</span>
-        <h1>Tu rutina</h1>
+        <span class="label">${placeLabel(plan, app.settings)} · ${emphasisLabel(plan)}</span>
+        <h1>${plan.nombre ?? planLabel(plan)}</h1>
       </div>
       <div class="row">
-        <button class="btn" data-action="back">Ajustar</button>
-        <button class="btn" data-action="regen">Otra rutina</button>
+        ${plan.fromRoutine ? "" : html`<button class="btn" data-action="back">Ajustar</button>
+        <button class="btn" data-action="regen">Otra rutina</button>`}
+        <button class="btn" data-action="save" ${plan.saved ? "disabled" : ""}>${plan.saved ? "Guardada" : "Guardar"}</button>
         <button class="btn primary" data-action="start">Empezar</button>
       </div>
     </div>
@@ -46,10 +55,11 @@ export function renderPreview(view, app) {
     <section class="card">
       <div class="summary-strip">
         <div class="stat"><div class="v">${fmtMin(plan.totalSec)}</div><div class="k">Duración real</div></div>
-        <div class="stat"><div class="v">${emphasisLabel(plan)}</div><div class="k">Énfasis</div></div>
         <div class="stat"><div class="v mono">${f.trabajo}/${f.descanso}</div><div class="k">Segundos trabajo / descanso</div></div>
         <div class="stat"><div class="v">${workSteps}</div><div class="k">Intervalos de trabajo</div></div>
+        <div class="stat"><div class="v">${plan.bloques.length}</div><div class="k">${plan.bloques.length === 1 ? "Bloque" : "Bloques"}</div></div>
       </div>
+      ${plan.prioridad?.length ? html`<span class="muted">Prioridad: ${plan.prioridad.map(k => { const [z, s] = k.split("."); return `${ZONES[z].nombre} ${ZONES[z].subs[s].toLowerCase()}`; }).join(", ")}</span>` : ""}
     </section>
 
     ${plan.calentamiento.length ? html`<section class="card">
@@ -58,7 +68,7 @@ export function renderPreview(view, app) {
     </section>` : ""}
 
     ${plan.bloques.map((b, i) => html`<section class="card">
-      <div class="section-title"><h3>Bloque ${i + 1} · ${MUSCLES[b.grupo] ?? b.grupo}</h3><span class="muted mono">${b.rondas} ${b.rondas === 1 ? "ronda" : "rondas"}</span></div>
+      <div class="section-title"><h3>Bloque ${i + 1} · ${blockTitle(b)}</h3><span class="muted mono">${b.rondas} ${b.rondas === 1 ? "ronda" : "rondas"}</span></div>
       <ul class="ex-list">${b.ejercicios.map(id => item(id, `${f.trabajo} s${EXERCISE_BY_ID[id].unilateral ? " · cambia de lado a la mitad" : ""}`, true))}</ul>
     </section>`)}
 
@@ -75,18 +85,25 @@ export function renderPreview(view, app) {
       case "toggle": open.has(id) ? open.delete(id) : open.add(id); break;
       case "swap": {
         const newId = swapExercise(plan, id, app.settings);
-        if (!newId) { toast("No hay otro ejercicio disponible para ese grupo"); return; }
-        plan.steps = buildSteps(plan, app.settings);
-        plan.totalSec = plan.steps.reduce((t, s) => t + s.duracion, 0);
+        if (!newId) { toast("No hay otro ejercicio disponible para esa zona"); return; }
+        plan.steps = buildSteps(plan, app.settings); plan.totalSec = sumSteps(plan.steps); plan.saved = false;
+        plan.bloques.forEach(b => { b.trabaja = [...new Set(b.ejercicios.map(x => EXERCISE_BY_ID[x].sub))]; });
         toast(`Cambiado por ${EXERCISE_BY_ID[newId].nombre}`);
         break;
       }
       case "regen": {
-        const req = { minutos: plan.minutos, enfoque: plan.enfoque, lugar: plan.lugar,
-          enfasis: app.request?.enfasis ?? "auto", calentamiento: plan.calentamiento.length > 0, estiramiento: plan.estiramiento.length > 0 };
-        app.plan = generateRoutine(req, app.settings, app.history); open.clear(); break;
+        const r = app.request;
+        app.plan = generateRoutine({ minutos: plan.minutos, lugar: plan.lugar, preset: plan.preset, zonas: plan.zonas, prioridad: plan.prioridad,
+          enfasis: plan.expres ? "masa" : plan.enfasis, calentamiento: plan.calentamiento.length > 0, estiramiento: plan.estiramiento.length > 0 },
+          app.settings, app.history);
+        if (r) r.step = "enfasis";
+        open.clear(); break;
       }
-      case "back": app.plan = null; open.clear(); app.go("entrenar"); return;
+      case "save": {
+        saveRoutine(plan, { nombre: `${planLabel(plan)} · ${placeLabel(plan, app.settings)} · ${plan.minutos} min` });
+        plan.saved = true; toast("Guardada en Rutinas"); break;
+      }
+      case "back": open.clear(); if (app.request) app.request.step = "enfasis"; app.plan = null; app.go("entrenar"); return;
       case "start": app.startSession(); return;
       default: return;
     }

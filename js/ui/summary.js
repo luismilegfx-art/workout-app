@@ -1,14 +1,14 @@
 // Registro al terminar: lo completado, peso y repeticiones, esfuerzo (RIR) y molestias.
 import { html, mount, fmtMin, toast, confirmInPage } from "./dom.js";
-import { FOCUSES, EMPHASES } from "../data/catalog.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
-import { addSession, lastLogFor } from "../store.js";
+import { addSession, lastLogFor, saveRoutine, updateRoutine } from "../store.js";
+import { planLabel, emphasisLabel, placeLabel } from "./preview.js";
 
 const RIR_OPTIONS = ["0", "1", "2", "3", "4+"];
 
 export function renderSummary(view, app) {
   const { plan, stats, finished } = app.result;
-  const form = app.result.form ??= { rir: null, notas: "", ex: {} };
+  const form = app.result.form ??= { rir: null, notas: "", ex: {}, estrellas: 0, guardar: !plan.saved && !plan.fromRoutine };
   const done = new Set(stats.completados);
 
   // Ejercicios principales en orden, con cuántos intervalos se hicieron
@@ -26,7 +26,7 @@ export function renderSummary(view, app) {
   mount(view, html`
     <div class="spread">
       <div class="stack" style="gap:4px">
-        <span class="label">${FOCUSES[plan.enfoque]?.nombre} · ${plan.expres ? "Exprés" : EMPHASES[plan.enfasis]?.nombre}</span>
+        <span class="label">${planLabel(plan)} · ${placeLabel(plan, app.settings)} · ${emphasisLabel(plan)}</span>
         <h1>${finished ? "Sesión completada" : "Sesión terminada"}</h1>
       </div>
       <div class="row">
@@ -50,6 +50,16 @@ export function renderSummary(view, app) {
       <div class="rir" role="group" aria-label="Repeticiones en reserva">
         ${RIR_OPTIONS.map(v => html`<button data-action="rir" data-value="${v}" aria-pressed="${form.rir === v}">${v}</button>`)}
       </div>
+    </section>
+
+    <section class="card">
+      <div class="stack" style="gap:2px">
+        <h3>¿Qué te pareció la rutina?</h3>
+        <span class="muted">La calificación y el comentario se guardan con la rutina.</span>
+      </div>
+      <div class="stars" role="group" aria-label="Calificación">${[1, 2, 3, 4, 5].map(n => html`<button data-action="star" data-value="${n}" class="${n <= form.estrellas ? "on" : ""}" aria-label="${n} estrellas">★</button>`)}</div>
+      ${plan.fromRoutine || plan.saved ? html`<span class="muted">Esta rutina ya está en Rutinas; se actualizará su calificación.</span>`
+        : html`<label class="check"><input type="checkbox" id="save-routine" ${form.guardar ? "checked" : ""}> Guardar esta rutina en Rutinas</label>`}
     </section>
 
     <section class="card">
@@ -82,6 +92,7 @@ export function renderSummary(view, app) {
 
   view.oninput = e => {
     const t = e.target; const field = t.dataset.field; if (!field) return;
+    if (t.id === "save-routine") { form.guardar = t.checked; return; }
     if (field === "notas") { form.notas = t.value; return; }
     const ex = form.ex[t.dataset.ex] ??= {};
     ex[field] = t.type === "checkbox" ? t.checked : t.value === "" ? null : Number(t.value);
@@ -91,6 +102,7 @@ export function renderSummary(view, app) {
   view.onclick = async e => {
     const t = e.target.closest("[data-action]"); if (!t) return;
     if (t.dataset.action === "rir") { form.rir = t.dataset.value; renderSummary(view, app); return; }
+    if (t.dataset.action === "star") { const n = Number(t.dataset.value); form.estrellas = form.estrellas === n ? 0 : n; renderSummary(view, app); return; }
     if (t.dataset.action === "discard") {
       const ok = await confirmInPage({ title: "¿Descartar la sesión?", body: "No se guardará en el historial.", ok: "Descartar", danger: true });
       if (ok) { app.result = null; app.go("entrenar"); }
@@ -101,17 +113,19 @@ export function renderSummary(view, app) {
       addSession({
         id: `s-${Date.now().toString(36)}`,
         fecha: new Date(stats.inicio).toISOString(),
-        enfoque: plan.enfoque, lugar: plan.lugar, enfasis: plan.enfasis, expres: plan.expres,
-        grupos: plan.grupos, minutosPlan: plan.minutos, duracionSeg: durSec, completa: finished,
+        zonas: plan.zonas, prioridad: plan.prioridad, lugar: plan.lugar, preset: plan.preset, enfasis: plan.enfasis, expres: plan.expres,
+        nombre: plan.nombre ?? planLabel(plan), rutinaId: plan.routineId ?? null, minutosPlan: plan.minutos, duracionSeg: durSec, completa: finished,
         formato: plan.formato, rir: form.rir, notas: form.notas || null,
         ejercicios: order.map(r => ({ id: r.id, intervalos: r.intervalos, completados: r.completados,
           reps: form.ex[r.id]?.reps ?? null, peso: form.ex[r.id]?.peso ?? null, molestia: !!form.ex[r.id]?.molestia })),
       });
+      if (plan.routineId) updateRoutine(plan.routineId, { ultimaVez: new Date().toISOString(), ...(form.estrellas ? { estrellas: form.estrellas } : {}), ...(form.notas ? { comentario: form.notas } : {}) });
+      else if (form.guardar) saveRoutine(plan, { nombre: `${planLabel(plan)} · ${placeLabel(plan, app.settings)} · ${plan.minutos} min`, estrellas: form.estrellas, comentario: form.notas, ultimaVez: new Date().toISOString() });
       if (molestias.length) app.updateSettings({ evitar: [...new Set([...app.settings.evitar, ...molestias])] });
       app.reloadHistory();
       app.result = null;
       toast(molestias.length ? "Guardada. Los ejercicios con molestia se evitarán." : "Sesión guardada");
-      app.go("historial");
+      app.go("progreso");
     }
   };
 }

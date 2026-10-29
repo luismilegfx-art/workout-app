@@ -17,6 +17,12 @@ Proyecto: aplicación de entrenamiento guiado por tiempo, de uso personal (Luism
 - `npm test` antes de cada commit que toque el motor.
 - La cámara (detección de pose con MediaPipe) solo funciona en un contexto seguro (GitHub Pages o localhost), no dentro de artefactos de Claude.
 
+## Estructura
+
+- Secciones: Progreso (inicio) · Rutinas · Entrenar (centro, destacado) · Biblioteca · Perfil.
+- Cada ejercicio principal declara su subzona (`sub: "zona.sub"`) en `js/data/exercises.js`; zonas y atajos en `js/data/catalog.js`.
+- La hoja de ruta por fases está en el documento base del Proyecto (pestaña Hoja de ruta).
+
 ## Pendiente
 
 - Integrar la cámara como botón opcional por ejercicio (campo `camara` en la biblioteca) usando `prototipos/prueba-camara-pose.html` como base.

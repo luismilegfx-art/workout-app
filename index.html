@@ -17,11 +17,17 @@
     <header class="topbar">
       <div class="topbar-in">
         <div class="brand">Workout <span>App</span></div>
-        <nav class="nav" aria-label="Secciones">
-          <a href="#entrenar" data-route="entrenar">Entrenar</a>
-          <a href="#historial" data-route="historial">Historial</a>
-          <a href="#biblioteca" data-route="biblioteca">Biblioteca</a>
-          <a href="#ajustes" data-route="ajustes">Ajustes</a>
+        <nav class="tabs" aria-label="Secciones">
+          <a href="#progreso" data-route="progreso">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M22 20H2"/></svg><span>Progreso</span></a>
+          <a href="#rutinas" data-route="rutinas">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span>Rutinas</span></a>
+          <a href="#entrenar" data-route="entrenar" class="tab-main">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12"/></svg><span>Entrenar</span></a>
+          <a href="#biblioteca" data-route="biblioteca">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/></svg><span>Biblioteca</span></a>
+          <a href="#perfil" data-route="perfil">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Perfil</span></a>
         </nav>
       </div>
     </header>

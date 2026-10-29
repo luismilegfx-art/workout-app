@@ -1,21 +1,22 @@
-// Punto de entrada: estado de la app y navegación entre pantallas.
+// Punto de entrada: estado de la app y navegación entre secciones.
 import { getSettings, saveSettings, getHistory } from "./store.js";
 import { configureAudio } from "./engine/voice.js";
-import { renderSetup } from "./ui/setup.js";
+import { renderProgress } from "./ui/progress.js";
+import { renderRoutines } from "./ui/routines.js";
+import { renderTrain, leaveTrain, newRequest } from "./ui/train.js";
 import { renderPreview } from "./ui/preview.js";
 import { openPlayer } from "./ui/player.js";
 import { renderSummary } from "./ui/summary.js";
-import { renderHistory } from "./ui/history.js";
 import { renderLibrary } from "./ui/library.js";
-import { renderSettings } from "./ui/settings.js";
+import { renderProfile } from "./ui/profile.js";
 
 const view = document.getElementById("view");
 
 export const app = {
   settings: getSettings(),
   history: getHistory(),
-  request: null,       // última configuración usada en "Entrenar"
-  plan: null,          // rutina generada pendiente de empezar
+  request: null,       // flujo de Entrenar en curso
+  plan: null,          // rutina generada o cargada, pendiente de empezar
   result: null,        // sesión terminada pendiente de registrar
 
   updateSettings(patch) {
@@ -25,26 +26,30 @@ export const app = {
   },
   reloadHistory() { this.history = getHistory(); },
   go(route) { if (location.hash === `#${route}`) render(); else location.hash = route; },
-  render() { render(); },
+  newTraining() { this.request = newRequest(this); this.plan = null; this.go("entrenar"); },
   startSession() { openPlayer(this); },
 };
 
+// Sección de la barra a la que pertenece cada pantalla
 const ROUTES = {
-  entrenar: () => app.plan ? renderPreview(view, app) : renderSetup(view, app),
-  rutina: () => app.plan ? renderPreview(view, app) : renderSetup(view, app),
-  resumen: () => app.result ? renderSummary(view, app) : renderSetup(view, app),
-  historial: () => renderHistory(view, app),
-  biblioteca: () => renderLibrary(view, app),
-  ajustes: () => renderSettings(view, app),
+  progreso:   { tab: "progreso",   render: () => renderProgress(view, app) },
+  rutinas:    { tab: "rutinas",    render: () => renderRoutines(view, app) },
+  entrenar:   { tab: "entrenar",   render: () => renderTrain(view, app) },
+  rutina:     { tab: "entrenar",   render: () => app.plan ? renderPreview(view, app) : renderTrain(view, app) },
+  resumen:    { tab: "entrenar",   render: () => app.result ? renderSummary(view, app) : renderProgress(view, app) },
+  biblioteca: { tab: "biblioteca", render: () => renderLibrary(view, app) },
+  perfil:     { tab: "perfil",     render: () => renderProfile(view, app) },
 };
 
 function render() {
-  const route = location.hash.replace("#", "") || "entrenar";
-  const fn = ROUTES[route] ?? ROUTES.entrenar;
-  const navRoute = ["rutina", "resumen"].includes(route) ? "entrenar" : route;
-  document.querySelectorAll(".nav a").forEach(a => a.toggleAttribute("aria-current", a.dataset.route === navRoute));
-  document.querySelectorAll(".nav a[aria-current]").forEach(a => a.setAttribute("aria-current", "page"));
-  fn();
+  const name = location.hash.replace("#", "") || "progreso";
+  const route = ROUTES[name] ?? ROUTES.progreso;
+  if (name !== "entrenar") leaveTrain();
+  document.querySelectorAll(".tabs a").forEach(a => {
+    if (a.dataset.route === route.tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  view.onclick = view.onchange = view.oninput = null;
+  route.render();
   window.scrollTo(0, 0);
 }
 

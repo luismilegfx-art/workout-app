@@ -5,12 +5,34 @@
 
 const TRANSICION = { corporal: 0, ligero: 10, pesas: 15, barra: 20 };
 
+// Subzona de la silueta que trabaja cada ejercicio principal ("zona.sub").
+// Se deduce del músculo y el patrón; un ejercicio puede fijarla con `sub`.
+function deriveSub(d) {
+  const id = d.id, p = d.patron;
+  switch (d.musculo) {
+    case "pecho": return /inclinado|pies-elevados/.test(id) ? "pecho.superior" : "pecho.medio";
+    case "espalda": return p === "halon-vertical" ? "espalda.dorsales" : p === "extension" ? "espalda.lumbar" : "espalda.alta";
+    case "hombros": return /laterales/.test(id) ? "hombros.lateral" : /pajaros|face-pull/.test(id) ? "hombros.posterior" : "hombros.anterior";
+    case "biceps": return "brazos.biceps";
+    case "triceps": return "brazos.triceps";
+    case "antebrazo": return "brazos.antebrazo";
+    case "core":
+      if (["rotacion", "flexion-lateral", "anti-flexion-lateral"].includes(p)) return "abdomen.oblicuos";
+      if (["anti-extension", "potencia"].includes(p)) return "abdomen.estabilidad";
+      return "abdomen.recto";
+    case "cuadriceps": case "isquios": case "gluteos": case "pantorrillas": case "aductores": return `piernas.${d.musculo}`;
+    default: return null;   // acondicionamiento: entra como complemento
+  }
+}
+
 function ex(d) {
   const equipo = d.equipo ?? ["corporal"];
+  const tipo = d.tipo ?? "principal";
   return {
     id: d.id,
     nombre: d.nombre,
-    tipo: d.tipo ?? "principal",            // calentamiento | principal | estiramiento
+    tipo,                                   // calentamiento | principal | estiramiento
+    sub: tipo === "principal" ? (d.sub ?? deriveSub(d)) : null,
     musculo: d.musculo,
     secundarios: d.secundarios ?? [],
     patron: d.patron ?? "aislamiento",
@@ -184,18 +206,21 @@ export const EXERCISES = [
   ex({ id: "curl-mancuernas", nombre: "Curl de bíceps con mancuernas", equipo: ["mancuernas"], musculo: "biceps", patron: "aislamiento", nivel: 1,
     tecnica: ["Codos pegados al torso", "Gira las palmas hacia arriba al subir"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Balancear el cuerpo" }),
-  ex({ id: "curl-martillo", nombre: "Curl martillo", equipo: ["mancuernas"], musculo: "biceps", secundarios: ["antebrazo"], patron: "aislamiento", nivel: 1,
+  ex({ id: "curl-martillo", nombre: "Curl martillo", equipo: ["mancuernas"], musculo: "biceps", secundarios: ["antebrazo"], patron: "aislamiento-neutro", nivel: 1,
     tecnica: ["Palmas mirándose entre sí", "Codos fijos, sube controlado"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Mover los codos hacia adelante" }),
   ex({ id: "curl-barra", nombre: "Curl con barra", equipo: ["barra"], musculo: "biceps", patron: "aislamiento", nivel: 1,
     tecnica: ["Agarre al ancho de hombros", "Sube sin mover los codos y baja en 2 segundos"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Echar la espalda hacia atrás" }),
-  ex({ id: "curl-concentrado", nombre: "Curl concentrado", equipo: ["mancuernas", "banco"], musculo: "biceps", patron: "aislamiento", nivel: 1, unilateral: true,
+  ex({ id: "curl-concentrado", nombre: "Curl concentrado", equipo: ["mancuernas", "banco"], musculo: "biceps", patron: "aislamiento-acortado", nivel: 1, unilateral: true,
     tecnica: ["Sentado, codo apoyado en la cara interna del muslo", "Sube lento y aprieta arriba"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Levantar el codo del muslo" }),
   ex({ id: "curl-polea", nombre: "Curl en polea", equipo: ["polea"], musculo: "biceps", patron: "aislamiento", nivel: 1,
     tecnica: ["Polea baja, codos pegados", "Tensión constante arriba y abajo"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Inclinarse hacia atrás" }),
+  ex({ id: "curl-inclinado", nombre: "Curl inclinado con mancuernas", equipo: ["mancuernas", "banco"], musculo: "biceps", patron: "aislamiento-estirado", nivel: 2,
+    tecnica: ["Banco inclinado a unos 45°, brazos colgando detrás del torso", "Sube sin adelantar los codos; el bíceps trabaja estirado"],
+    respiracion: "Exhala al subir, inhala al bajar", error: "Despegar la espalda del banco" }),
   ex({ id: "curl-kettlebell", nombre: "Curl con kettlebell", equipo: ["kettlebell"], musculo: "biceps", patron: "aislamiento", nivel: 1,
     tecnica: ["Agarra la kettlebell por los lados del asa", "Codos fijos, sube y baja controlado"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Usar impulso de la cadera" }),
@@ -287,6 +312,63 @@ export const EXERCISES = [
   ex({ id: "curl-femoral", nombre: "Curl femoral en máquina", equipo: ["maquina"], musculo: "isquios", patron: "aislamiento", nivel: 1,
     tecnica: ["Rodilla alineada con el eje", "Flexiona controlado y baja en 2 segundos"],
     respiracion: "Exhala al flexionar, inhala al volver", error: "Levantar la cadera del banco" }),
+
+  // ───────────── Complementos para presets reducidos (solo mancuernas) ─────────────
+  ex({ id: "press-suelo-mancuernas", nombre: "Press de suelo con mancuernas", equipo: ["mancuernas"], musculo: "pecho", secundarios: ["triceps"], patron: "empuje-horizontal", nivel: 1,
+    tecnica: ["Acostado en el suelo, rodillas flexionadas", "Baja hasta que los codos toquen el suelo suavemente y empuja"],
+    respiracion: "Inhala al bajar, exhala al empujar", error: "Rebotar los codos contra el suelo" }),
+  ex({ id: "press-suelo-cerrado", nombre: "Press de suelo con agarre neutro", equipo: ["mancuernas"], musculo: "pecho", sub: "pecho.superior", secundarios: ["hombros", "triceps"], patron: "empuje-horizontal", nivel: 1,
+    tecnica: ["Mancuernas juntas, palmas mirándose", "Empuja hacia arriba y ligeramente hacia la cara"],
+    respiracion: "Inhala al bajar, exhala al empujar", error: "Separar las mancuernas al subir" }),
+  ex({ id: "remo-inclinado-mancuernas", nombre: "Remo inclinado con mancuernas", equipo: ["mancuernas"], musculo: "espalda", secundarios: ["biceps", "hombros"], patron: "halon-horizontal", nivel: 1,
+    tecnica: ["Torso inclinado unos 45°, espalda recta", "Lleva las mancuernas a la cadera juntando escápulas"],
+    respiracion: "Exhala al subir, inhala al bajar", error: "Redondear la espalda baja" }),
+  ex({ id: "pullover-suelo", nombre: "Pullover en el suelo", equipo: ["mancuernas"], musculo: "espalda", secundarios: ["pecho"], patron: "halon-vertical", nivel: 1,
+    tecnica: ["Acostado, una mancuerna con ambas manos sobre el pecho", "Llévala detrás de la cabeza hasta casi tocar el suelo y vuelve"],
+    respiracion: "Inhala al bajar, exhala al subir", error: "Doblar mucho los codos" }),
+  ex({ id: "remo-alto-mancuernas", nombre: "Remo alto con mancuernas", equipo: ["mancuernas"], musculo: "hombros", sub: "hombros.lateral", secundarios: ["espalda"], patron: "halon-vertical", nivel: 2,
+    tecnica: ["Mancuernas al frente, agarre algo abierto", "Sube los codos hacia los lados hasta la altura del pecho, no más"],
+    respiracion: "Exhala al subir, inhala al bajar", error: "Subir las manos por encima de los codos" }),
+  ex({ id: "elevacion-lateral-polea", nombre: "Elevación lateral en polea", equipo: ["polea"], musculo: "hombros", sub: "hombros.lateral", patron: "aislamiento", nivel: 1, unilateral: true,
+    tecnica: ["Polea baja, agarre con la mano contraria", "Sube hasta la altura del hombro; cambia a la mitad"],
+    respiracion: "Exhala al subir, inhala al bajar", error: "Inclinar el torso para subir" }),
+  ex({ id: "y-t-boca-abajo", nombre: "Elevaciones Y-T boca abajo", musculo: "hombros", sub: "hombros.posterior", secundarios: ["espalda"], patron: "aislamiento", nivel: 1,
+    tecnica: ["Boca abajo, brazos estirados", "Sube los brazos en forma de Y y luego de T, pulgares arriba"],
+    respiracion: "Exhala al subir", error: "Subir con la espalda baja en vez de los hombros" }),
+  ex({ id: "curl-muneca", nombre: "Curl de muñeca con mancuernas", equipo: ["mancuernas"], musculo: "antebrazo", patron: "aislamiento", nivel: 1,
+    tecnica: ["Antebrazos apoyados en los muslos, palmas arriba", "Sube solo la muñeca y baja lento"],
+    respiracion: "Natural", error: "Mover el antebrazo" }),
+  ex({ id: "curl-invertido", nombre: "Curl invertido", equipo: ["mancuernas"], musculo: "antebrazo", secundarios: ["biceps"], patron: "aislamiento", nivel: 1,
+    tecnica: ["Palmas hacia abajo", "Sube con los codos pegados y baja controlado"],
+    respiracion: "Exhala al subir, inhala al bajar", error: "Doblar las muñecas" }),
+  ex({ id: "paseo-granjero", nombre: "Paseo del granjero", equipo: ["mancuernas"], musculo: "antebrazo", secundarios: ["core", "espalda"], patron: "acarreo", nivel: 1,
+    tecnica: ["Una mancuerna pesada en cada mano", "Camina erguido con pasos cortos, hombros atrás"],
+    respiracion: "Respira constante sin soltar el abdomen", error: "Inclinarse hacia un lado" }),
+  ex({ id: "peso-muerto-una-pierna", nombre: "Peso muerto a una pierna", equipo: ["mancuernas"], musculo: "isquios", secundarios: ["gluteos", "core"], patron: "bisagra", nivel: 2, unilateral: true,
+    tecnica: ["Mancuerna en la mano contraria a la pierna de apoyo", "Inclínate desde la cadera con la pierna libre hacia atrás; cambia a la mitad"],
+    respiracion: "Inhala al bajar, exhala al subir", error: "Girar la cadera hacia afuera" }),
+  ex({ id: "curl-femoral-mancuerna", nombre: "Curl femoral con mancuerna", equipo: ["mancuernas", "banco"], musculo: "isquios", patron: "aislamiento", nivel: 2,
+    tecnica: ["Boca abajo en el banco, mancuerna entre los pies", "Flexiona las rodillas controlado y baja lento"],
+    respiracion: "Exhala al subir, inhala al bajar", error: "Despegar la cadera del banco" }),
+
+  // ───────────── Aductores ─────────────
+  ex({ id: "sentadilla-sumo", nombre: "Sentadilla sumo con kettlebell", equipo: ["kettlebell"], musculo: "aductores", secundarios: ["gluteos", "cuadriceps"], patron: "sentadilla", nivel: 1, camara: "sentadilla",
+    tecnica: ["Pies bastante abiertos, puntas hacia afuera", "Kettlebell colgando entre las piernas", "Baja con las rodillas siguiendo las puntas"],
+    respiracion: "Inhala al bajar, exhala al subir", error: "Rodillas cerrándose hacia adentro" }),
+  ex({ id: "plancha-copenhague", nombre: "Plancha Copenhague", equipo: ["banco"], musculo: "aductores", secundarios: ["core"], patron: "anti-flexion-lateral", nivel: 2, unilateral: true,
+    tecnica: ["De lado, pierna de arriba apoyada en el banco", "Eleva la cadera y sostén; cambia de lado a la mitad"],
+    respiracion: "Respira constante", error: "Dejar caer la cadera" }),
+  ex({ id: "aductor-maquina", nombre: "Aductores en máquina", equipo: ["maquina"], musculo: "aductores", patron: "aislamiento", nivel: 1,
+    tecnica: ["Espalda apoyada en el respaldo", "Cierra las piernas controlado y abre en 2 segundos"],
+    respiracion: "Exhala al cerrar, inhala al abrir", error: "Soltar el peso de golpe al abrir" }),
+  ex({ id: "zancada-lateral", nombre: "Zancada lateral", musculo: "aductores", secundarios: ["gluteos", "cuadriceps"], patron: "zancada", nivel: 1,
+    tecnica: ["Paso amplio hacia un lado, la otra pierna estirada", "Cadera atrás y pecho arriba; alterna lados"],
+    respiracion: "Inhala al bajar, exhala al volver", error: "Talón de la pierna flexionada despegado" }),
+
+  // ───────────── Lumbar ─────────────
+  ex({ id: "bird-dog", nombre: "Bird dog", musculo: "espalda", secundarios: ["core", "gluteos"], patron: "extension", nivel: 1,
+    tecnica: ["En cuatro apoyos, espalda neutra", "Extiende brazo y pierna contrarios sin girar la cadera; alterna"],
+    respiracion: "Exhala al extender", error: "Arquear la espalda baja al estirar la pierna" }),
 
   // ───────────── Pantorrillas ─────────────
   ex({ id: "elevacion-talones", nombre: "Elevación de talones", musculo: "pantorrillas", patron: "aislamiento", nivel: 1,

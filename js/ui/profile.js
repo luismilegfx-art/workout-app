@@ -1,4 +1,4 @@
-// Ajustes: perfil, equipo de casa, audio, ejercicios evitados, parámetros del generador y copia de seguridad.
+// Perfil: datos de entrenamiento, presets de equipo, audio, ejercicios evitados, parámetros del generador y copia de seguridad.
 import { html, mount, toast, confirmInPage } from "./dom.js";
 import { EQUIPMENT, EMPHASES, LEVELS } from "../data/catalog.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
@@ -15,7 +15,7 @@ applyTheme();
 
 const FORMAT_LABELS = { fuerza: "Fuerza", masa: "Masa", condicion: "Condición", expres: "Exprés" };
 
-export function renderSettings(view, app) {
+export function renderProfile(view, app) {
   const s = app.settings, p = s.params;
   const theme = applyTheme();
   const num = (id, label, value, suffix, attrs = "") => html`<div class="field">
@@ -23,7 +23,7 @@ export function renderSettings(view, app) {
     <div class="row" style="flex-wrap:nowrap"><input class="input" type="number" id="${id}" data-param="${id}" value="${value}" ${attrs}><span class="muted">${suffix}</span></div></div>`;
 
   mount(view, html`
-    <div class="spread"><h1>Ajustes</h1></div>
+    <div class="spread"><h1>Perfil</h1></div>
 
     <div class="grid-2">
       <section class="card">
@@ -31,9 +31,13 @@ export function renderSettings(view, app) {
         <span class="label">Nivel</span>
         <div class="seg" role="group" aria-label="Nivel">${Object.entries(LEVELS).map(([k, v]) =>
           html`<button data-action="level" data-value="${k}" aria-pressed="${s.nivel === Number(k)}">${v}</button>`)}</div>
-        <span class="label">Objetivos que rotan en modo Auto</span>
+        <span class="label">Prioridades de entrenamiento</span>
         <div class="chips">${Object.entries(EMPHASES).map(([k, v]) =>
           html`<button class="chip" data-action="goal" data-value="${k}" aria-pressed="${s.objetivos.includes(k)}">${v.nombre}</button>`)}</div>
+        <div class="field" style="max-width:220px">
+          <label class="label" for="metaSemanal">Meta semanal</label>
+          <div class="row" style="flex-wrap:nowrap"><input class="input" type="number" id="metaSemanal" min="1" max="14" value="${s.metaSemanal ?? 4}"><span class="muted">sesiones</span></div>
+        </div>
         <span class="label">Unidad de peso</span>
         <span>Libras (lb)</span>
       </section>
@@ -49,9 +53,12 @@ export function renderSettings(view, app) {
     </div>
 
     <section class="card">
-      <h3>Equipo en casa</h3>
-      <div class="chips">${Object.entries(EQUIPMENT).filter(([k]) => !["maquina", "polea"].includes(k)).map(([k, v]) =>
-        html`<button class="chip" data-action="equip" data-value="${k}" aria-pressed="${s.equipoCasa.includes(k)}" ${k === "corporal" ? "disabled" : ""}>${v}</button>`)}</div>
+      <div class="spread"><h3>Equipo para entrenar en casa</h3><span class="muted" style="font-size:.85rem">Crear presets nuevos: próximamente</span></div>
+      ${s.presetsEquipo.map(p => html`<div class="stack" style="gap:6px">
+        <b>${p.nombre}${p.id === s.presetActivo ? html` <span class="tag accent">En uso</span>` : ""}</b>
+        <div class="chips">${Object.entries(EQUIPMENT).filter(([k]) => !["maquina", "polea"].includes(k)).map(([k, v]) =>
+          html`<button class="chip" data-action="equip" data-preset="${p.id}" data-value="${k}" aria-pressed="${p.equipo.includes(k)}" ${k === "corporal" ? "disabled" : ""}>${v}</button>`)}</div>
+      </div>`)}
     </section>
 
     <section class="card">
@@ -109,8 +116,12 @@ export function renderSettings(view, app) {
         app.updateSettings({ objetivos: [...set] }); break;
       }
       case "equip": {
-        const set = new Set(s.equipoCasa); set.has(v) ? set.delete(v) : set.add(v); set.add("corporal");
-        app.updateSettings({ equipoCasa: [...set] }); break;
+        const presetsEquipo = s.presetsEquipo.map(p => {
+          if (p.id !== t.dataset.preset) return p;
+          const set = new Set(p.equipo); set.has(v) ? set.delete(v) : set.add(v); set.add("corporal");
+          return { ...p, equipo: [...set] };
+        });
+        app.updateSettings({ presetsEquipo }); break;
       }
       case "theme": try { localStorage.setItem(THEME_KEY, v); } catch {} break;
       case "unavoid": app.updateSettings({ evitar: s.evitar.filter(id => id !== v) }); break;
@@ -129,17 +140,18 @@ export function renderSettings(view, app) {
       }
       default: return;
     }
-    renderSettings(view, app);
+    renderProfile(view, app);
   };
 
   view.onchange = async e => {
     const t = e.target;
     if (t.id === "opt-voz") return app.updateSettings({ voz: t.checked });
     if (t.id === "opt-pitidos") return app.updateSettings({ pitidos: t.checked });
+    if (t.id === "metaSemanal") { const n = Number(t.value); if (n >= 1 && n <= 14) { app.updateSettings({ metaSemanal: n }); toast("Guardado"); } return; }
     if (t.id === "import-file" && t.files[0]) {
       try {
         importData(await t.files[0].text());
-        app.settings = getSettings(); app.reloadHistory(); toast("Datos importados"); renderSettings(view, app);
+        app.settings = getSettings(); app.reloadHistory(); toast("Datos importados"); renderProfile(view, app);
       } catch (err) { toast(err.message || "No se pudo leer el archivo"); }
       return;
     }
@@ -154,7 +166,7 @@ export function renderSettings(view, app) {
       const formatos = structuredClone(p.formatos);
       if (idx === undefined) formatos[k][field] = value; else formatos[k][field][Number(idx)] = value;
       const [lo, hi] = Array.isArray(formatos[k][field]) ? formatos[k][field] : [0, 1];
-      if (lo > hi) { toast("El mínimo no puede ser mayor que el máximo"); renderSettings(view, app); return; }
+      if (lo > hi) { toast("El mínimo no puede ser mayor que el máximo"); renderProfile(view, app); return; }
       app.updateSettings({ params: { ...p, formatos } });
       toast("Guardado");
     }

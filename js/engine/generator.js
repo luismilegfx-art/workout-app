@@ -1,7 +1,7 @@
 // Generador de rutinas y distribución del tiempo.
 // Implementa el algoritmo de la especificación técnica. Es una función pura: misma entrada + misma semilla = misma rutina.
 import { EXERCISES, EXERCISE_BY_ID } from "../data/exercises.js";
-import { FOCUSES, GYM_EQUIPMENT, MUSCLES } from "../data/catalog.js";
+import { ZONES, FOCUSES, equipmentFor } from "../data/catalog.js";
 
 const PREP_SEC = 10;            // cuenta regresiva inicial
 const RECENT_SESSIONS = 2;      // sesiones recientes cuyos ejercicios se evitan
@@ -14,7 +14,7 @@ export function rngFrom(seed) {             // mulberry32
 }
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const range = (lo, hi, step) => { const out = []; for (let v = lo; v <= hi; v += step) out.push(v); return out.length ? out : [lo]; };
-const roundTo = (v, step) => Math.round(v / step) * step;
+const isIsolation = e => e.patron.startsWith("aislamiento");
 
 function weightedPick(items, weightOf, rng) {
   const ws = items.map(weightOf); const total = ws.reduce((a, b) => a + b, 0);
@@ -22,10 +22,6 @@ function weightedPick(items, weightOf, rng) {
   let r = rng() * total;
   for (let i = 0; i < items.length; i++) { r -= ws[i]; if (r <= 0) return items[i]; }
   return items[items.length - 1];
-}
-
-function availableEquipment(lugar, settings) {
-  return new Set(lugar === "gym" ? GYM_EQUIPMENT : settings.equipoCasa);
 }
 function usable(e, equip, settings) {
   return e.equipo.every(q => equip.has(q)) && !settings.desactivados.includes(e.id) && !settings.evitar.includes(e.id);
@@ -35,13 +31,17 @@ function recentIds(history) {
   history.slice(0, RECENT_SESSIONS).forEach(s => (s.ejercicios ?? []).forEach(e => ids.add(e.id)));
   return ids;
 }
+// Índice en el historial de la última sesión que trabajó una zona (más alto = hace más tiempo)
+function lastTrained(history, zona) {
+  const i = history.findIndex(s => s.zonas ? zona in s.zonas : (FOCUSES[s.enfoque]?.zonas ?? {})[zona]);
+  return i === -1 ? Infinity : i;
+}
 
-// Énfasis automático: el objetivo usado hace más tiempo
+// Énfasis sugerido cuando no se indica: el objetivo usado hace más tiempo
 export function pickEmphasis(settings, history, rng) {
   const options = settings.objetivos.length ? settings.objetivos : ["masa"];
   const lastUse = Object.fromEntries(options.map(o => [o, Infinity]));
   history.forEach((s, i) => { if (s.enfasis in lastUse && lastUse[s.enfasis] === Infinity) lastUse[s.enfasis] = i; });
-  // Mayor índice = usado hace más tiempo; Infinity = nunca usado
   const best = Math.max(...Object.values(lastUse));
   const tied = options.filter(o => lastUse[o] === best);
   return tied[Math.floor(rng() * tied.length)];
@@ -50,29 +50,26 @@ export function pickEmphasis(settings, history, rng) {
 // ───────── 1–2. reservar calentamiento y estiramiento ─────────
 function reserve(totalSec, include, pct, min, max, paso, expres) {
   if (!include) return { sec: 0, n: 0 };
-  if (expres) return { sec: paso * 1, n: 1 };            // activación breve
+  if (expres) return { sec: paso, n: 1 };                 // activación breve
   const target = clamp(totalSec * pct / 100, min, Math.min(max, totalSec * 0.25));
   const n = Math.max(1, Math.round(target / paso));
   return { sec: n * paso, n };
 }
 
-// ───────── 3–4. escoger formato y estructura que mejor llenan el tiempo ─────────
+// ───────── 3–4. formato y estructura que mejor llenan el tiempo ─────────
 function blockDuration(f) {
   return f.rondas * f.porBloque * f.trabajo + f.rondas * (f.porBloque - 1) * f.descanso + (f.rondas - 1) * f.descansoRonda;
 }
-export function planDuration(f) {
-  return f.bloques * blockDuration(f) + (f.bloques - 1) * f.descansoRonda;
-}
+export function planDuration(f) { return f.bloques * blockDuration(f) + (f.bloques - 1) * f.descansoRonda; }
+
 function searchStructure(workSec, fmt, maxBlocks, maxPerBlock) {
   const mid = ([a, b]) => (a + b) / 2;
   let best = null;
-  const trabajos = range(fmt.trabajo[0], fmt.trabajo[1], 5);
-  const descansos = range(fmt.descanso[0], fmt.descanso[1], 5);
   for (let bloques = 1; bloques <= maxBlocks; bloques++)
-  for (const porBloque of range(fmt.porBloque[0], Math.min(fmt.porBloque[1], maxPerBlock), 1))
+  for (const porBloque of range(fmt.porBloque[0], Math.max(fmt.porBloque[0], Math.min(fmt.porBloque[1], maxPerBlock)), 1))
   for (const rondas of range(fmt.rondas[0], fmt.rondas[1], 1))
-  for (const trabajo of trabajos)
-  for (const descanso of descansos) {
+  for (const trabajo of range(fmt.trabajo[0], fmt.trabajo[1], 5))
+  for (const descanso of range(fmt.descanso[0], fmt.descanso[1], 5)) {
     const f = { bloques, porBloque, rondas, trabajo, descanso, descansoRonda: fmt.descansoRonda };
     const d = planDuration(f);
     const fit = Math.abs(d - workSec) / workSec;
@@ -86,73 +83,115 @@ function searchStructure(workSec, fmt, maxBlocks, maxPerBlock) {
   return best;
 }
 
-// ───────── 5. selección de ejercicios ─────────
+// ───────── 5. zonas → bloques ─────────
+// Normaliza la selección: { zona: [subzonas] } + prioridades ["zona.sub"]
+function normalizeTargets(req) {
+  const zonas = req.zonas ?? FOCUSES[req.enfoque]?.zonas ?? FOCUSES.completo.zonas;
+  const prio = new Set(req.prioridad ?? []);
+  return Object.keys(ZONES)
+    .filter(z => zonas[z]?.length)
+    .map(z => ({ zona: z, subs: [...zonas[z]], prio: zonas[z].filter(s => prio.has(`${z}.${s}`)) }));
+}
+
+// Reparte los bloques entre zonas: con pocos bloques entran primero las zonas con prioridad y las
+// trabajadas hace más tiempo; con bloques de sobra, las zonas con más subzonas o prioridades reciben más.
+function allocateBlocks(units, n, history) {
+  if (n <= units.length) {
+    const ranked = [...units].sort((a, b) => (b.prio.length - a.prio.length) || (lastTrained(history, b.zona) - lastTrained(history, a.zona)));
+    const chosen = new Set(ranked.slice(0, n).map(u => u.zona));
+    return units.filter(u => chosen.has(u.zona)).map(u => ({ zona: u.zona, subs: orderSubs(u), prio: u.prio }));
+  }
+  const counts = new Map(units.map(u => [u.zona, 1]));
+  const weight = u => u.subs.length + 2 * u.prio.length;
+  for (let extra = n - units.length; extra > 0; extra--) {
+    const u = [...units].sort((a, b) => weight(b) / counts.get(b.zona) - weight(a) / counts.get(a.zona))[0];
+    counts.set(u.zona, counts.get(u.zona) + 1);
+  }
+  const blocks = [];
+  for (const u of units) {
+    const k = counts.get(u.zona), order = orderSubs(u);
+    for (let i = 0; i < k; i++) {
+      // Las subzonas se reparten entre los bloques de la zona; las prioritarias aparecen en todos
+      const own = order.filter((s, j) => u.prio.includes(s) || j % k === i);
+      blocks.push({ zona: u.zona, subs: own.length ? own : order, prio: u.prio });
+    }
+  }
+  // Intercalar zonas para no repetir la misma zona en bloques seguidos
+  const out = [], queues = units.map(u => blocks.filter(b => b.zona === u.zona));
+  while (queues.some(q => q.length)) queues.forEach(q => q.length && out.push(q.shift()));
+  return out;
+}
+const orderSubs = u => [...u.prio, ...u.subs.filter(s => !u.prio.includes(s))];
+
+// ───────── 6. selección de ejercicios ─────────
 function exerciseWeight(e, ctx) {
   let w = 1;
   const lvl = ctx.settings.nivel;
   if (e.nivel > lvl + 1) return 0;
   if (e.nivel === lvl + 1) w *= 0.25; else if (e.nivel < lvl) w *= 0.7;
   if (ctx.recent.has(e.id)) w *= 0.25;
-  if (ctx.blockPatterns.has(e.patron)) w *= 0.4;
-  const compuesto = e.patron !== "aislamiento";
+  if (ctx.blockPatterns.has(e.patron)) w *= 0.35;          // ángulos y agarres distintos dentro del bloque
+  const compuesto = !isIsolation(e);
   if (ctx.enfasis === "fuerza") w *= (e.carga && compuesto) ? 1.8 : compuesto ? 1.2 : 0.6;
   if (ctx.enfasis === "condicion" || ctx.enfasis === "expres") w *= (e.patron === "potencia" || !e.carga) ? 1.5 : 0.8;
   if (ctx.lugar === "gym" && e.equipo.some(q => q === "maquina" || q === "polea")) w *= 1.2;
   return w;
 }
 
-function poolFor(group, ctx) {
-  const base = ctx.pool.filter(e => !ctx.used.has(e.id));
-  const primary = base.filter(e => e.musculo === group);
-  const secondary = base.filter(e => e.musculo !== group && e.secundarios.includes(group));
-  return { primary, secondary };
-}
-
-function pickForBlock(group, count, ctx, rng) {
+function pickForBlock(block, count, ctx, rng) {
   const chosen = []; ctx.blockPatterns = new Set();
+  // Orden de subzonas por posición: las prioritarias cuentan doble
+  const cycle = [...block.prio, ...block.subs];
   for (let i = 0; i < count; i++) {
-    const { primary, secondary } = poolFor(group, ctx);
-    let candidates = primary.length ? primary : secondary;
-    if (!candidates.length) {
-      // Sin ejercicios nuevos del grupo: se repiten los ya usados (como volver a una ronda anterior)
-      candidates = ctx.pool.filter(e => !chosen.includes(e.id) && (e.musculo === group || e.secundarios.includes(group)));
-    }
-    if (!candidates.length) {
-      candidates = ctx.pool.filter(e => !chosen.includes(e.id) && ctx.focusGroups.includes(e.musculo));
-    }
-    if (!candidates.length) break;
+    const sub = `${block.zona}.${cycle[i % cycle.length]}`;
+    const fresh = e => !ctx.used.has(e.id) && !chosen.includes(e.id);
+    const notInBlock = e => !chosen.includes(e.id);
+    const blockSub = e => block.subs.some(s => e.sub === `${block.zona}.${s}`);
+    const selected = e => ctx.selected.has(e.sub);
+    const sameZone = e => e.sub?.startsWith(block.zona + ".");
+    // Siempre dentro de lo escogido antes de salir de la selección; repetir es mejor que salirse
+    const tiers = [
+      ctx.pool.filter(e => e.sub === sub && fresh(e)),
+      ctx.pool.filter(e => blockSub(e) && fresh(e)),
+      ctx.pool.filter(e => selected(e) && fresh(e)),
+      ctx.pool.filter(e => e.sub === sub && notInBlock(e)),       // repetir un ejercicio ya hecho (volver a la ronda)
+      ctx.pool.filter(e => blockSub(e) && notInBlock(e)),
+      ctx.pool.filter(e => selected(e) && notInBlock(e)),
+      ctx.pool.filter(e => sameZone(e) && notInBlock(e)),         // último recurso
+    ];
+    const candidates = tiers.find(t => t.length);
+    if (!candidates) break;
     const pick = weightedPick(candidates, e => exerciseWeight(e, ctx), rng) ?? candidates[0];
     chosen.push(pick.id); ctx.used.add(pick.id); ctx.blockPatterns.add(pick.patron);
   }
   return chosen;
 }
 
-// Calentamiento y estiramiento: primero los de la zona trabajada, luego los generales;
-// si hacen falta más, se repiten los de la zona antes de usar ejercicios de otra zona.
-function pickAuxiliary(tipo, zona, n, ctx, rng, grupos = []) {
+// Calentamiento y estiramiento: primero los de los músculos trabajados, luego los de la zona del cuerpo,
+// luego los generales; si hacen falta más, se repiten antes de usar ejercicios de otra zona.
+function pickAuxiliary(tipo, zona, n, ctx, rng, musculos) {
   const list = EXERCISES.filter(e => e.tipo === tipo && !ctx.settings.desactivados.includes(e.id));
   const shuffle = arr => arr.map(v => [rng(), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
-  const byGroup = shuffle(list.filter(e => grupos.includes(e.musculo)));
-  const byZone = shuffle(list.filter(e => e.zona === zona && !grupos.includes(e.musculo)));
-  const general = shuffle(list.filter(e => e.zona === "completo" && e.zona !== zona && !grupos.includes(e.musculo)));
-  const ordered = [...new Set([...byGroup, ...byZone, ...general])];
+  const byMuscle = shuffle(list.filter(e => musculos.includes(e.musculo) && (e.zona === zona || e.zona === "completo" || zona === "completo")));
+  const byZone = shuffle(list.filter(e => e.zona === zona && !musculos.includes(e.musculo)));
+  const general = shuffle(list.filter(e => e.zona === "completo" && !musculos.includes(e.musculo)));
+  const rest = zona === "completo" ? shuffle(list) : [];
+  const ordered = [...new Set([...byMuscle, ...byZone, ...general, ...rest])];
   const out = [];
   for (let k = 0; out.length < n && ordered.length; k++) out.push(ordered[k % ordered.length].id);
   return out;
 }
-
-// Si hay menos bloques que grupos, entran primero los grupos trabajados hace más tiempo
-function chooseGroups(groups, count, history) {
-  if (count >= groups.length) return groups;
-  const last = g => { const i = history.findIndex(s => (s.grupos ?? []).includes(g)); return i === -1 ? Infinity : i; };
-  const chosen = [...groups].sort((a, b) => last(b) - last(a)).slice(0, count);
-  return groups.filter(g => chosen.includes(g));       // conserva el orden natural del enfoque
+function bodyZone(units) {
+  const upper = units.some(u => ["pecho", "espalda", "hombros", "brazos"].includes(u.zona));
+  const lower = units.some(u => u.zona === "piernas");
+  return upper && lower ? "completo" : lower ? "inferior" : upper ? "superior" : "completo";
 }
 
 // ───────── generador ─────────
 /**
- * @param {object} req  { minutos, enfoque, lugar: "casa"|"gym", enfasis: "auto"|"fuerza"|"masa"|"condicion",
- *                        calentamiento?: boolean, estiramiento?: boolean, seed?: number }
+ * @param {object} req  { minutos, lugar: "casa"|"gym", equipo?: string[], zonas: {zona: [subs]}, prioridad?: ["zona.sub"],
+ *                        enfasis: "fuerza"|"masa"|"condicion"|"auto", calentamiento?: boolean, estiramiento?: boolean, seed?: number }
+ *                      (también acepta `enfoque` antiguo: push, pull, piernas…)
  */
 export function generateRoutine(req, settings, history = []) {
   const seed = req.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -160,7 +199,6 @@ export function generateRoutine(req, settings, history = []) {
   const p = settings.params;
   const totalSec = Math.round(req.minutos * 60);
   const expres = req.minutos <= p.exprésHasta;
-  const focus = FOCUSES[req.enfoque] ?? FOCUSES.completo;
   const enfasis = expres ? "expres" : (req.enfasis && req.enfasis !== "auto" ? req.enfasis : pickEmphasis(settings, history, rng));
   const includeWarm = req.calentamiento ?? !expres;
   const includeCool = req.estiramiento ?? !expres;
@@ -169,43 +207,47 @@ export function generateRoutine(req, settings, history = []) {
   const cool = reserve(totalSec, includeCool, p.estiramientoPct, p.estiramientoMin, p.estiramientoMax, p.pasoEstiramiento, expres);
   const workSec = Math.max(60, totalSec - PREP_SEC - warm.sec - cool.sec);
 
-  const equip = availableEquipment(req.lugar, settings);
-  const pool = EXERCISES.filter(e => e.tipo === "principal" && usable(e, equip, settings));
+  const equip = new Set(req.equipo ?? equipmentFor(req.lugar, settings, req.preset));
+  const pool = EXERCISES.filter(e => e.tipo === "principal" && e.sub && usable(e, equip, settings));
 
-  // Grupos de los bloques. Exprés: un solo grupo (el del enfoque, o uno de ellos)
-  let groups = focus.grupos.filter(g => pool.some(e => e.musculo === g || e.secundarios.includes(g)));
-  if (!groups.length) groups = ["core"];
-  if (expres) groups = [groups[Math.floor(rng() * groups.length)]];
-
-  const fmt = p.formatos[enfasis];
-  const poolInFocus = pool.filter(e => groups.includes(e.musculo)).length || pool.length;
-  const maxPerBlock = expres ? Math.min(fmt.porBloque[1], poolInFocus) : fmt.porBloque[1];
-  const maxBlocks = expres ? 1 : 10;
-  let f = searchStructure(workSec, fmt, maxBlocks, Math.max(fmt.porBloque[0], maxPerBlock));
-
-  const ctx = { settings, pool, used: new Set(), recent: recentIds(history), enfasis, lugar: req.lugar,
-    focusGroups: focus.grupos, blockPatterns: new Set() };
-
-  const blockGroups = chooseGroups(groups, f.bloques, history);
-  const bloques = [];
-  for (let b = 0; b < f.bloques; b++) {
-    const grupo = blockGroups[b % blockGroups.length];
-    const ejercicios = pickForBlock(grupo, f.porBloque, ctx, rng);
-    if (ejercicios.length) bloques.push({ grupo, rondas: f.rondas, ejercicios });
+  let units = normalizeTargets(req).filter(u => pool.some(e => e.sub?.startsWith(u.zona + ".")));
+  if (!units.length) units = [{ zona: "abdomen", subs: Object.keys(ZONES.abdomen.subs), prio: [] }];
+  if (expres) {     // exprés: una sola zona (la que tenga prioridad, o una al azar)
+    const withPrio = units.filter(u => u.prio.length);
+    const pickFrom = withPrio.length ? withPrio : units;
+    units = [pickFrom[Math.floor(rng() * pickFrom.length)]];
   }
 
+  const fmt = p.formatos[enfasis];
+  const zonePool = pool.filter(e => units.some(u => e.sub.startsWith(u.zona + "."))).length;
+  const maxPerBlock = expres ? Math.min(fmt.porBloque[1], zonePool) : fmt.porBloque[1];
+  const f = searchStructure(workSec, fmt, expres ? 1 : 10, maxPerBlock);
+
+  const ctx = { settings, pool, used: new Set(), recent: recentIds(history), enfasis, lugar: req.lugar, blockPatterns: new Set(),
+    selected: new Set(units.flatMap(u => u.subs.map(s => `${u.zona}.${s}`))) };
+  const bloques = [];
+  for (const b of allocateBlocks(units, f.bloques, history)) {
+    const ejercicios = pickForBlock(b, f.porBloque, ctx, rng);
+    if (ejercicios.length) bloques.push({ zona: b.zona, subs: b.subs, rondas: f.rondas, ejercicios,
+      trabaja: [...new Set(ejercicios.map(id => EXERCISE_BY_ID[id].sub))] });
+  }
+
+  const musculos = [...new Set(bloques.flatMap(b => b.ejercicios.map(id => EXERCISE_BY_ID[id].musculo)))];
+  const zona = bodyZone(units);
   const plan = {
     id: `r-${Date.now().toString(36)}-${seed.toString(36)}`,
     seed, creada: new Date().toISOString(),
-    minutos: req.minutos, enfoque: req.enfoque, lugar: req.lugar, enfasis, expres,
+    minutos: req.minutos, lugar: req.lugar, preset: req.lugar === "casa" ? (req.preset ?? settings.presetActivo) : null,
+    equipo: [...equip], enfasis, expres,
+    zonas: Object.fromEntries(units.map(u => [u.zona, u.subs])),
+    prioridad: units.flatMap(u => u.prio.map(s => `${u.zona}.${s}`)),
     formato: { trabajo: f.trabajo, descanso: f.descanso, descansoRonda: f.descansoRonda },
-    calentamiento: pickAuxiliary("calentamiento", focus.zona, warm.n, ctx, rng, blockGroups),
-    estiramiento: pickAuxiliary("estiramiento", focus.zona, cool.n, ctx, rng, blockGroups),
+    calentamiento: pickAuxiliary("calentamiento", zona, warm.n, ctx, rng, musculos),
+    estiramiento: pickAuxiliary("estiramiento", zona, cool.n, ctx, rng, musculos),
     bloques,
-    grupos: [...new Set(bloques.map(b => b.grupo))],
   };
 
-  // 6–7. Ajuste final al tiempo total, con las transiciones reales incluidas
+  // 7. Ajuste final al tiempo total, con las transiciones reales incluidas
   const margin = totalSec * p.margenTiempo / 100;
   let steps = buildSteps(plan, settings), dur = sumSteps(steps);
   const lo = fmt.trabajo[0] - 10, hi = fmt.trabajo[1] + 10;
@@ -220,8 +262,19 @@ export function generateRoutine(req, settings, history = []) {
 }
 
 // ───────── línea de tiempo ─────────
-const sumSteps = steps => steps.reduce((t, s) => t + s.duracion, 0);
+export const sumSteps = steps => steps.reduce((t, s) => t + s.duracion, 0);
 const sameEquipment = (a, b) => a.equipo.join() === b.equipo.join();
+
+// Título del bloque según lo que realmente trabaja: "Pecho", "Hombros · Lateral", "Espalda + Brazos"
+export function blockTitle(bl) {
+  if (!ZONES[bl.zona]) return bl.grupo ?? "";
+  const subs = bl.trabaja ?? (bl.subs ?? []).map(s => `${bl.zona}.${s}`);
+  const zones = [...new Set(subs.map(k => k.split(".")[0]))];
+  if (zones.length > 1) return zones.map(z => ZONES[z].nombre).join(" + ");
+  const z = zones[0] ?? bl.zona, all = Object.keys(ZONES[z].subs);
+  const own = subs.map(k => k.split(".")[1]);
+  return own.length < all.length ? `${ZONES[z].nombre} · ${own.map(s => ZONES[z].subs[s]).join(", ")}` : ZONES[z].nombre;
+}
 
 export function buildSteps(plan, settings) {
   const p = settings.params;
@@ -239,7 +292,7 @@ export function buildSteps(plan, settings) {
       bl.ejercicios.forEach((id, j) => {
         const e = EXERCISE_BY_ID[id];
         push({ tipo: "trabajo", ejercicio: id, duracion: trabajo, bloque: b, ronda: r, slot: j,
-          fase: `Bloque ${b + 1} · ${MUSCLES[bl.grupo] ?? bl.grupo}`, rondas: bl.rondas, cambioLado: e.unilateral });
+          fase: `Bloque ${b + 1} · ${blockTitle(bl)}`, rondas: bl.rondas, cambioLado: e.unilateral });
         const lastInRound = j === bl.ejercicios.length - 1;
         const nextId = !lastInRound ? bl.ejercicios[j + 1]
           : r < bl.rondas - 1 ? bl.ejercicios[0]
@@ -261,7 +314,6 @@ export function buildSteps(plan, settings) {
   plan.estiramiento.forEach((id, k) => push({ tipo: "estiramiento", ejercicio: id, duracion: p.pasoEstiramiento,
     fase: "Estiramiento", paso: k + 1, pasos: plan.estiramiento.length, cambioLado: EXERCISE_BY_ID[id]?.unilateral }));
 
-  // Siguiente ejercicio para cada paso (lo que la voz anuncia y la pantalla muestra)
   for (let k = 0; k < steps.length; k++) {
     if (steps[k].siguiente === undefined) {
       const nxt = steps.slice(k + 1).find(s => s.ejercicio);
@@ -271,16 +323,16 @@ export function buildSteps(plan, settings) {
   return steps;
 }
 
-// Cambiar un ejercicio por otro del mismo grupo (máquina ocupada, falta de equipo)
+// Cambiar un ejercicio por otro de la misma subzona (o zona): máquina ocupada, falta de equipo
 export function swapExercise(plan, oldId, settings) {
   const block = plan.bloques.find(b => b.ejercicios.includes(oldId));
   if (!block) return null;
-  const equip = availableEquipment(plan.lugar, settings);
+  const equip = new Set(plan.equipo ?? equipmentFor(plan.lugar, settings, plan.preset));
   const inPlan = new Set(plan.bloques.flatMap(b => b.ejercicios));
   const old = EXERCISE_BY_ID[oldId];
-  const candidates = EXERCISES.filter(e => e.tipo === "principal" && !inPlan.has(e.id) && usable(e, equip, settings)
-    && (e.musculo === block.grupo || e.musculo === old.musculo) && e.nivel <= settings.nivel + 1);
-  if (!candidates.length) return null;
+  const base = EXERCISES.filter(e => e.tipo === "principal" && !inPlan.has(e.id) && usable(e, equip, settings) && e.nivel <= settings.nivel + 1);
+  const candidates = [base.filter(e => e.sub === old.sub), base.filter(e => e.sub?.startsWith(block.zona + "."))].find(t => t.length);
+  if (!candidates) return null;
   const pick = candidates[Math.floor(Math.random() * candidates.length)];
   block.ejercicios = block.ejercicios.map(id => id === oldId ? pick.id : id);
   plan.steps.forEach(s => { if (s.ejercicio === oldId) s.ejercicio = pick.id; if (s.siguiente === oldId) s.siguiente = pick.id; });
