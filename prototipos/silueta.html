@@ -8,112 +8,117 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap">
 <style>
-/* Figura sintética de paneles facetados: chasis en grafito, zonas musculares como placas que se iluminan en latón */
+/* Figura anatómica limpia; la selección vive en una tarjeta flotante junto al puntero. Colores provisionales. */
 :root {
   --bg: #f1efea; --surface: #ffffff; --line: #d6d1c7; --fg: #1b1c1d; --muted: #6b6a64; --accent: #9a7428; --accent-fg: #fff;
-  --chassis: #dcd8cf; --chassis-edge: #b9b3a6; --plate: #c9c4b8; --plate-edge: #a29b8c; --plate-hover: #b8b1a2;
-  --glow: #b8892e; --glow-strong: #e0a93a; --halo: rgb(154 116 40 / .14); --seam: #f7f5f0;
+  --body: #cfcac0; --muscle: #bdb7ab; --muscle-hover: #a9a294; --sel: #b8892e; --prio: #e0a93a; --edge: #f1efea;
   --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
-  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --shadow: 0 10px 30px rgb(0 0 0 / .15);
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0d0f10; --surface: #15181a; --line: #2a2f33; --fg: #ece8e1; --muted: #9b9a93; --accent: #c9a25b; --accent-fg: #15130f;
-  --chassis: #1b1f22; --chassis-edge: #3a4248; --plate: #22282c; --plate-edge: #46525a; --plate-hover: #2d363c;
-  --glow: #c9a25b; --glow-strong: #f2c879; --halo: rgb(201 162 91 / .16); --seam: #0d0f10; color-scheme: dark; } }
+  --bg: #0d0f10; --surface: #171a1c; --line: #2c3135; --fg: #ece8e1; --muted: #9b9a93; --accent: #c9a25b; --accent-fg: #15130f;
+  --body: #2b3135; --muscle: #343b40; --muscle-hover: #455058; --sel: #c9a25b; --prio: #f2c879; --edge: #0d0f10;
+  --shadow: 0 12px 34px rgb(0 0 0 / .55); color-scheme: dark; } }
 :root[data-theme="dark"] {
-  --bg: #0d0f10; --surface: #15181a; --line: #2a2f33; --fg: #ece8e1; --muted: #9b9a93; --accent: #c9a25b; --accent-fg: #15130f;
-  --chassis: #1b1f22; --chassis-edge: #3a4248; --plate: #22282c; --plate-edge: #46525a; --plate-hover: #2d363c;
-  --glow: #c9a25b; --glow-strong: #f2c879; --halo: rgb(201 162 91 / .16); --seam: #0d0f10; color-scheme: dark; }
+  --bg: #0d0f10; --surface: #171a1c; --line: #2c3135; --fg: #ece8e1; --muted: #9b9a93; --accent: #c9a25b; --accent-fg: #15130f;
+  --body: #2b3135; --muscle: #343b40; --muscle-hover: #455058; --sel: #c9a25b; --prio: #f2c879; --edge: #0d0f10;
+  --shadow: 0 12px 34px rgb(0 0 0 / .55); color-scheme: dark; }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body);
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--text);
   padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 button { font: inherit; color: inherit; cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
-.head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
 h1 { font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1; text-transform: uppercase; margin: 0; }
-h2 { font-family: var(--display); font-weight: 800; font-size: 1.25rem; text-transform: uppercase; letter-spacing: .03em; margin: 0; }
+h2 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; text-transform: uppercase; letter-spacing: .03em; margin: 0; }
 .label { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .muted { color: var(--muted); }
 
-.layout { display: grid; grid-template-columns: 200px minmax(0, 1fr) 320px; gap: 22px; align-items: start; }
-@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.layout { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
 /* Atajos */
-.presets { display: flex; flex-direction: column; gap: 8px; }
-@media (max-width: 1000px) { .presets { flex-direction: row; flex-wrap: wrap; } }
-.preset { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-.preset b { font-family: var(--display); font-weight: 800; font-size: 1.15rem; text-transform: uppercase; letter-spacing: .04em; }
-.preset span { font-size: .8rem; color: var(--muted); }
-.preset[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-@media (max-width: 1000px) { .preset { padding: 8px 12px; } .preset span { display: none; } }
+.presets { display: flex; flex-direction: column; gap: 4px; }
+.presets .label { margin-bottom: 6px; }
+.preset { text-align: left; border: 0; background: transparent; padding: 8px 12px; border-radius: 8px; font-weight: 600; color: var(--muted); }
+.preset:hover { color: var(--fg); }
+.preset[aria-pressed="true"] { color: var(--fg); background: var(--surface); box-shadow: inset 2px 0 0 var(--accent); }
+@media (max-width: 760px) {
+  .presets { flex-direction: row; flex-wrap: wrap; gap: 6px; } .presets .label { width: 100%; margin: 0; }
+  .preset { border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+  .preset[aria-pressed="true"] { box-shadow: none; border-color: var(--accent); }
+}
 
 /* Figura */
-.stage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
-.views { display: flex; gap: 8px; justify-content: center; width: 100%; }
-.figure-wrap { position: relative; flex: 1 1 0; max-width: 300px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.figure-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.views { display: flex; gap: 12px; justify-content: center; width: 100%; }
+.fig { flex: 1 1 0; max-width: 300px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fig svg { width: 100%; height: auto; display: block; touch-action: manipulation; }
 .view-name { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .toggle { display: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.toggle button { border: 0; background: transparent; padding: 8px 16px; font-weight: 600; }
+.toggle button { border: 0; background: transparent; padding: 8px 18px; font-weight: 600; }
 .toggle button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
 @media (max-width: 560px) {
-  .toggle { display: inline-flex; }
-  .figure-wrap { max-width: 320px; }
-  .stage[data-view="front"] .figure-wrap[data-view="back"], .stage[data-view="back"] .figure-wrap[data-view="front"] { display: none; }
+  .toggle { display: inline-flex; } .fig { max-width: 330px; }
+  .stage[data-view="front"] .fig[data-view="back"], .stage[data-view="back"] .fig[data-view="front"] { display: none; }
 }
-.hover-name { min-height: 1.6em; font-family: var(--display); font-weight: 700; font-size: 1.2rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
 
-.floor { fill: none; stroke: var(--chassis-edge); stroke-width: 1; opacity: .5; }
-.chassis { fill: var(--chassis); stroke: var(--chassis-edge); stroke-width: 1; stroke-linejoin: round; }
-.visor { fill: var(--glow-strong); }
-.seam { stroke: var(--seam); stroke-width: 1.4; fill: none; }
-.plate:not([fill]) { fill: var(--plate); }
-.plate { stroke: var(--plate-edge); stroke-width: 1; stroke-linejoin: round; cursor: pointer;
-  transition: fill .25s ease, stroke .25s ease, filter .25s ease; }
-.plate:not([fill]):hover, .plate.hover:not([fill]) { fill: var(--plate-hover); }
-.plate:hover, .plate.hover { stroke: var(--glow-strong); }
-.plate.on { stroke: var(--glow); }
-.plate.prio { stroke-width: 1.6; animation: pulse 2.4s ease-in-out infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .78; } }
-.plate.dim { opacity: .5; }
+.part { fill: var(--body); stroke: var(--edge); stroke-width: 2; }
+.m { fill: var(--muscle); stroke: var(--edge); stroke-width: 2; cursor: pointer; transition: fill .2s ease; }
+.m.hover { fill: var(--muscle-hover); }
+.m.on { fill: var(--sel); }
+.m.prio { fill: var(--prio); }
+.m.on.hover { fill: var(--prio); }
 
-/* Panel de zonas */
-.panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.zone-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.zone-card.active { border-color: var(--accent); }
-.zone-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.x { border: 0; background: transparent; color: var(--muted); font-size: .85rem; padding: 4px 6px; }
-.subs { display: flex; flex-direction: column; gap: 6px; }
-.sub { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
-.sub-toggle { text-align: left; border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 7px 10px; font-weight: 600; font-size: .92rem; display: flex; gap: 8px; align-items: center; }
-.sub-toggle::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--muted); flex: none; }
-.sub-toggle[aria-pressed="true"]::before { background: var(--accent); border-color: var(--accent); }
+/* Etiqueta que sigue al puntero */
+.tip { position: fixed; z-index: 30; pointer-events: none; background: var(--fg); color: var(--bg); font-size: .8rem; font-weight: 600;
+  padding: 4px 9px; border-radius: 6px; transform: translate(14px, -50%); white-space: nowrap; }
+
+/* Tarjeta flotante de la zona */
+.pop { position: fixed; z-index: 40; width: 260px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.pop-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pop-close { border: 0; background: transparent; color: var(--muted); font-size: .85rem; padding: 2px 4px; }
+.subs { display: flex; flex-direction: column; gap: 4px; }
+.sub { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.sub-toggle { display: flex; gap: 10px; align-items: center; text-align: left; border: 0; background: transparent; padding: 7px 6px; border-radius: 6px; font-weight: 600; font-size: .95rem; }
+.sub-toggle:hover { background: var(--bg); }
+.sub-toggle::before { content: ""; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--muted); flex: none; }
+.sub-toggle[aria-pressed="true"]::before { background: var(--accent); border-color: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--surface); }
 .sub-toggle[aria-pressed="false"] { color: var(--muted); }
-.star { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 7px 10px; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.star { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 10px; font-size: .75rem; font-weight: 700; color: var(--muted); }
 .star[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
-.hint { font-size: .85rem; color: var(--muted); margin: 0; }
-.empty { border: 1px dashed var(--line); border-radius: 10px; padding: 20px 16px; text-align: center; color: var(--muted); }
-.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: .92rem; display: flex; flex-direction: column; gap: 6px; }
-.summary b { color: var(--fg); }
-.next { border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg); padding: 12px 20px; font-family: var(--display); font-weight: 800; font-size: 1.1rem; letter-spacing: .08em; text-transform: uppercase; }
-.next:disabled { opacity: .4; cursor: not-allowed; }
-@media (prefers-reduced-motion: reduce) { .plate { transition: none; animation: none !important; } }
+.star:disabled { opacity: .35; cursor: not-allowed; }
+.pop-foot { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.link { border: 0; background: transparent; color: var(--muted); font-size: .85rem; padding: 4px 2px; }
+.done { border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg); font-weight: 700; padding: 6px 16px; }
+@media (max-width: 640px) {
+  .pop { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; border-radius: 16px 16px 0 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .tip { display: none; }
+}
+
+/* Selección (solo aparece cuando hay algo escogido) */
+.picked { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: .9rem; }
+.chip small { color: var(--accent); font-weight: 700; margin-left: 4px; }
+.next { border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg); padding: 10px 22px; font-family: var(--display); font-weight: 800; font-size: 1.1rem; letter-spacing: .08em; text-transform: uppercase; }
+.credit { font-size: .72rem; color: var(--muted); text-align: center; }
+@media (prefers-reduced-motion: reduce) { .m { transition: none; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="head">
-    <div>
-      <span class="label">Paso 2 de 4 · Zona</span>
-      <h1>¿Qué vas a trabajar?</h1>
-    </div>
-    <span class="muted">Toca una zona o usa un atajo. Prioridad es opcional.</span>
+  <div>
+    <span class="label">Paso 2 de 4 · Zona</span>
+    <h1>¿Qué vas a trabajar?</h1>
   </div>
 
   <div class="layout">
-    <div class="presets" id="presets" role="group" aria-label="Atajos"></div>
+    <div class="presets" id="presets" role="group" aria-label="Atajos"><span class="label">Atajos</span></div>
 
     <div class="stage" id="stage" data-view="front">
       <div class="toggle" role="group" aria-label="Vista">
@@ -121,18 +126,21 @@ h2 { font-family: var(--display); font-weight: 800; font-size: 1.25rem; text-tra
         <button data-view="back" aria-pressed="false">Espalda</button>
       </div>
       <div class="views">
-        <div class="figure-wrap" data-view="front"><svg id="fig-front" viewBox="0 0 300 640" role="img" aria-label="Figura de frente"></svg><span class="view-name">Frente</span></div>
-        <div class="figure-wrap" data-view="back"><svg id="fig-back" viewBox="0 0 300 640" role="img" aria-label="Figura de espalda"></svg><span class="view-name">Espalda</span></div>
+        <div class="fig" data-view="front"><svg id="svg-front" viewBox="0 0 724 1448" role="img" aria-label="Cuerpo de frente"></svg><span class="view-name">Frente</span></div>
+        <div class="fig" data-view="back"><svg id="svg-back" viewBox="724 0 724 1448" role="img" aria-label="Cuerpo de espalda"></svg><span class="view-name">Espalda</span></div>
       </div>
-      <div class="hover-name" id="hoverName" aria-live="polite"></div>
+      <div class="picked" id="picked"></div>
+      <div class="credit">Figura basada en react-native-body-highlighter (MIT)</div>
     </div>
-
-    <div class="panel" id="panel"></div>
   </div>
 </div>
+<div class="tip" id="tip" hidden></div>
+<div class="pop" id="pop" hidden role="dialog" aria-modal="false"></div>
 
-<script>
-// ───────── Datos: zonas, subzonas y atajos (los mismos que usará el generador) ─────────
+<script type="module">
+import { BODY_FRONT, BODY_BACK } from "../js/data/body-paths.js";
+
+// ───────── Zonas, subzonas y atajos ─────────
 const ZONES = {
   pecho:   { nombre: "Pecho",   subs: { superior: "Superior", medio: "Medio e inferior" } },
   espalda: { nombre: "Espalda", subs: { dorsales: "Dorsales (ancho)", alta: "Espalda alta (grosor)", lumbar: "Lumbar" } },
@@ -143,215 +151,195 @@ const ZONES = {
 };
 const ALL = Object.fromEntries(Object.entries(ZONES).map(([z, v]) => [z, Object.keys(v.subs)]));
 const PRESETS = {
-  push:     { nombre: "Push",  desc: "Pecho, hombros, tríceps", sel: { pecho: ["superior", "medio"], hombros: ["anterior", "lateral"], brazos: ["triceps"] } },
-  pull:     { nombre: "Pull",  desc: "Espalda, hombro posterior, bíceps", sel: { espalda: ["dorsales", "alta"], hombros: ["posterior"], brazos: ["biceps", "antebrazo"] } },
-  piernas:  { nombre: "Piernas", desc: "Todo el tren inferior", sel: { piernas: ALL.piernas } },
-  core:     { nombre: "Core",  desc: "Abdomen y lumbar", sel: { abdomen: ALL.abdomen, espalda: ["lumbar"] } },
-  completo: { nombre: "Cuerpo completo", desc: "Todas las zonas", sel: ALL },
+  push:     { nombre: "Push",  sel: { pecho: ["superior", "medio"], hombros: ["anterior", "lateral"], brazos: ["triceps"] } },
+  pull:     { nombre: "Pull",  sel: { espalda: ["dorsales", "alta"], hombros: ["posterior"], brazos: ["biceps", "antebrazo"] } },
+  piernas:  { nombre: "Piernas", sel: { piernas: ALL.piernas } },
+  core:     { nombre: "Core",  sel: { abdomen: ALL.abdomen, espalda: ["lumbar"] } },
+  completo: { nombre: "Cuerpo completo", sel: ALL },
 };
 
-// ───────── Geometría: paneles del lado derecho de la figura; el izquierdo se refleja ─────────
-const M = pts => pts.map(([x, y]) => [300 - x, y]);
-const sym = half => [...half, ...M(half).reverse()];            // contorno simétrico a partir de la mitad
-
-const HEAD = sym([[150, 22], [166, 26], [177, 40], [179, 60], [173, 80], [161, 94], [150, 98]]);
-const NECK = sym([[150, 98], [160, 97], [163, 113], [150, 114]]);
-const ARM_CHASSIS = [   // codo, mano
-  [[198, 226], [212, 224], [216, 232], [214, 236], [200, 236]],
-  [[203, 302], [214, 300], [221, 320], [216, 338], [205, 338], [200, 318]],
-];
-const LEG_CHASSIS = [   // rodilla, pie
-  [[170, 420], [190, 417], [193, 436], [186, 448], [172, 448], [167, 433]],
-  [[172, 564], [187, 563], [196, 582], [192, 594], [166, 594], [168, 578]],
-];
-const PELVIS = sym([[150, 300], [162, 296], [184, 266], [192, 284], [186, 300], [170, 313], [150, 318]]);
-const PELVIS_BACK = sym([[150, 278], [178, 272], [186, 278], [178, 276], [150, 282]]);
-
-const REGIONS = [
-  // Frente
-  { v: "front", z: "espalda", s: "alta",       name: "Trapecio",          pts: [[158, 104], [192, 120], [176, 124], [164, 118]] },
-  { v: "front", z: "hombros", s: "lateral",    name: "Hombro lateral",    pts: [[192, 120], [212, 128], [220, 150], [214, 174], [205, 160], [200, 138]] },
-  { v: "front", z: "hombros", s: "anterior",   name: "Hombro anterior",   pts: [[176, 124], [192, 120], [200, 138], [205, 160], [197, 166], [186, 146]] },
-  { v: "front", z: "pecho",   s: "superior",   name: "Pecho superior",    pts: [[153, 122], [176, 124], [186, 146], [153, 146]] },
-  { v: "front", z: "pecho",   s: "medio",      name: "Pecho medio e inferior", pts: [[153, 149], [186, 149], [196, 167], [186, 180], [167, 186], [153, 182]] },
-  { v: "front", z: "brazos",  s: "biceps",     name: "Bíceps",            pts: [[205, 163], [214, 176], [216, 204], [211, 222], [200, 222], [196, 202], [198, 170]] },
-  { v: "front", z: "brazos",  s: "antebrazo",  name: "Antebrazo",         pts: [[200, 239], [214, 238], [222, 260], [222, 290], [213, 299], [204, 298], [198, 264]] },
-  { v: "front", z: "abdomen", s: "recto",      name: "Recto abdominal",   pts: [[153, 189], [169, 186], [171, 209], [153, 211]] },
-  { v: "front", z: "abdomen", s: "recto",      name: "Recto abdominal",   pts: [[153, 214], [171, 212], [172, 236], [153, 238]] },
-  { v: "front", z: "abdomen", s: "recto",      name: "Recto abdominal",   pts: [[153, 241], [172, 239], [170, 264], [153, 268]] },
-  { v: "front", z: "abdomen", s: "estabilidad", name: "Core profundo",    pts: [[153, 271], [169, 267], [162, 293], [153, 297]] },
-  { v: "front", z: "abdomen", s: "oblicuos",   name: "Oblicuos",          pts: [[172, 186], [186, 182], [194, 200], [192, 232], [184, 262], [175, 264], [175, 238], [174, 210]] },
-  { v: "front", z: "piernas", s: "cuadriceps", name: "Cuádriceps",        pts: [[172, 314], [186, 302], [194, 292], [198, 330], [196, 380], [188, 414], [176, 417], [171, 390], [167, 350]] },
-  { v: "front", z: "piernas", s: "aductores",  name: "Aductores",         pts: [[153, 321], [169, 316], [164, 350], [168, 388], [160, 390], [155, 352]] },
-  { v: "front", z: "piernas", s: "pantorrillas", name: "Pierna inferior", pts: [[172, 451], [187, 451], [194, 472], [192, 520], [184, 559], [175, 559], [170, 520], [168, 480]] },
-  // Espalda
-  { v: "back", z: "espalda",  s: "alta",       name: "Espalda alta",      pts: [[153, 101], [160, 104], [192, 120], [186, 138], [171, 158], [153, 172]] },
-  { v: "back", z: "hombros",  s: "posterior",  name: "Hombro posterior",  pts: [[192, 120], [212, 128], [220, 150], [214, 174], [202, 160], [189, 140]] },
-  { v: "back", z: "espalda",  s: "alta",       name: "Espalda alta",      pts: [[153, 176], [170, 162], [163, 212], [153, 214]] },
-  { v: "back", z: "espalda",  s: "dorsales",   name: "Dorsales",          pts: [[173, 160], [188, 142], [198, 166], [197, 196], [189, 226], [174, 250], [166, 212]] },
-  { v: "back", z: "espalda",  s: "lumbar",     name: "Lumbar",            pts: [[153, 217], [164, 215], [172, 250], [176, 270], [153, 275]] },
-  { v: "back", z: "brazos",   s: "triceps",    name: "Tríceps",           pts: [[204, 162], [214, 176], [216, 204], [211, 222], [200, 222], [196, 202], [198, 168]] },
-  { v: "back", z: "brazos",   s: "antebrazo",  name: "Antebrazo",         pts: [[200, 239], [214, 238], [222, 260], [222, 290], [213, 299], [204, 298], [198, 264]] },
-  { v: "back", z: "piernas",  s: "gluteos",    name: "Glúteos",           pts: [[153, 285], [178, 279], [192, 288], [196, 314], [184, 330], [163, 332], [153, 326]] },
-  { v: "back", z: "piernas",  s: "isquios",    name: "Isquiotibiales",    pts: [[164, 336], [185, 334], [196, 318], [196, 362], [190, 410], [176, 417], [169, 390], [164, 360]] },
-  { v: "back", z: "piernas",  s: "aductores",  name: "Aductores",         pts: [[153, 330], [161, 336], [161, 360], [166, 390], [158, 392], [155, 352]] },
-  { v: "back", z: "piernas",  s: "pantorrillas", name: "Pantorrillas",    pts: [[172, 451], [189, 449], [197, 476], [195, 510], [185, 540], [175, 548], [169, 510], [167, 476]] },
-];
-
-// Contorno del torso (chasis detrás de las placas)
-const TORSO_FRONT = sym([[150, 112], [163, 113], [192, 120], [196, 168], [196, 200], [192, 236], [186, 266], [184, 268], [150, 300]]);
-const TORSO_BACK = sym([[150, 98], [160, 100], [192, 120], [197, 166], [198, 196], [190, 228], [178, 272], [150, 280]]);
-const UPPER_ARM = [[192, 120], [212, 128], [220, 150], [216, 204], [212, 224], [198, 226], [196, 168]];
-const FOREARM = [[200, 236], [214, 236], [222, 258], [223, 292], [214, 301], [203, 302], [198, 264]];
-const THIGH = [[150, 318], [170, 313], [192, 284], [198, 330], [196, 380], [190, 418], [170, 420], [160, 392], [153, 352]];
-const SHIN = [[168, 448], [188, 448], [196, 474], [194, 520], [186, 562], [172, 563], [169, 520], [166, 476]];
+// Trazo anatómico → zona.subzona. "split" divide un músculo en dos subzonas.
+const MAP = {
+  front: {
+    chest: { z: "pecho", split: { axis: "y", at: 0.45, a: "superior", b: "medio" } },
+    deltoids: { z: "hombros", split: { axis: "x-out", at: 0.5, a: "lateral", b: "anterior" } },
+    biceps: { z: "brazos", s: "biceps" }, triceps: { z: "brazos", s: "triceps" }, forearm: { z: "brazos", s: "antebrazo" },
+    abs: { z: "abdomen", s: "recto" }, obliques: { z: "abdomen", s: "oblicuos" },
+    quadriceps: { z: "piernas", s: "cuadriceps" }, adductors: { z: "piernas", s: "aductores" },
+    tibialis: { z: "piernas", s: "pantorrillas" }, calves: { z: "piernas", s: "pantorrillas" },
+    trapezius: { z: "espalda", s: "alta" },
+  },
+  back: {
+    trapezius: { z: "espalda", s: "alta" }, "upper-back": { z: "espalda", s: "dorsales" }, "lower-back": { z: "espalda", s: "lumbar" },
+    deltoids: { z: "hombros", s: "posterior" }, triceps: { z: "brazos", s: "triceps" }, forearm: { z: "brazos", s: "antebrazo" },
+    gluteal: { z: "piernas", s: "gluteos" }, hamstring: { z: "piernas", s: "isquios" },
+    adductors: { z: "piernas", s: "aductores" }, calves: { z: "piernas", s: "pantorrillas" },
+  },
+};
+const CENTER_X = { front: 362, back: 1086 };   // eje del cuerpo en cada vista
 
 // ───────── Estado ─────────
-const state = { sel: {}, prio: new Set(), active: null, preset: null };   // sel: zona → [subzonas incluidas]
-const key = (z, s) => `${z}.${s}`;
+const state = { sel: {}, prio: new Set(), preset: null, open: null };
+const K = (z, s) => `${z}.${s}`;
+const subName = (z, s) => ZONES[z].subs[s];
 
-// ───────── Render SVG ─────────
-const P = pts => pts.map(p => p.join(",")).join(" ");
-function figure(view) {
-  const u = view;
-  const defs = `<defs>
-    <radialGradient id="haloG-${u}" cx="50%" cy="42%" r="55%"><stop offset="0" stop-color="var(--glow)" stop-opacity=".18"/><stop offset="1" stop-color="var(--glow)" stop-opacity="0"/></radialGradient>
-    <linearGradient id="plateOn-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--glow)" stop-opacity=".75"/><stop offset="1" stop-color="var(--glow)" stop-opacity=".45"/></linearGradient>
-    <linearGradient id="platePrio-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3d6"/><stop offset=".35" stop-color="var(--glow-strong)"/><stop offset="1" stop-color="var(--glow)"/></linearGradient>
-    <filter id="glow-${u}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glowStrong-${u}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="soft-${u}"><feGaussianBlur stdDeviation="1.2"/></filter>
-  </defs>`;
-  const both = pts => `<polygon class="chassis" points="${P(pts)}"/><polygon class="chassis" points="${P(M(pts))}"/>`;
-  let out = defs;
-  out += `<ellipse class="halo" cx="150" cy="280" rx="140" ry="270" fill="url(#haloG-${u})"/>`;
-  out += `<ellipse class="floor" cx="150" cy="600" rx="70" ry="10"/><ellipse class="floor" cx="150" cy="600" rx="110" ry="16" opacity=".25"/>`;
-  out += `<polygon class="chassis" points="${P(view === "front" ? TORSO_FRONT : TORSO_BACK)}"/>`;
-  out += both(UPPER_ARM) + both(FOREARM) + both(THIGH) + both(SHIN);
-  out += ARM_CHASSIS.map(both).join("") + LEG_CHASSIS.map(both).join("");
-  out += `<polygon class="chassis" points="${P(view === "front" ? PELVIS : PELVIS_BACK)}"/>`;
-  out += `<polygon class="chassis" points="${P(NECK)}"/><polygon class="chassis" points="${P(HEAD)}"/>`;
-  // Rasgos: visor y líneas de ensamble (diseño propio)
-  if (view === "front") {
-    out += `<rect class="visor" x="131" y="55.5" width="38" height="4" rx="2" filter="url(#glow-${u})"/>`;
-    out += `<polyline class="seam" points="150,26 150,52"/><polyline class="seam" points="142,74 150,80 158,74"/>`;
-  } else {
-    out += `<polyline class="seam" points="136,40 150,34 164,40"/><polyline class="seam" points="150,60 150,94"/>`;
-  }
-  REGIONS.filter(r => r.v === view).forEach((r, i) => {
-    for (const pts of [r.pts, M(r.pts)]) {
-      out += `<polygon class="plate" data-z="${r.z}" data-s="${r.s}" data-name="${r.name}" points="${P(pts)}" tabindex="0" role="button" aria-label="${ZONES[r.z].nombre}: ${r.name}"><title>${r.name}</title></polygon>`;
+// ───────── Dibujo de la figura ─────────
+const NS = "http://www.w3.org/2000/svg";
+function build(svg, parts, view) {
+  const defs = document.createElementNS(NS, "defs"); svg.appendChild(defs);
+  let clipN = 0;
+  for (const part of parts) {
+    const map = MAP[view][part.slug];
+    const paths = [...part.left.map(d => [d, "l"]), ...part.right.map(d => [d, "r"]), ...part.common.map(d => [d, "c"])];
+    for (const [d] of paths) {
+      const el = document.createElementNS(NS, "path"); el.setAttribute("d", d);
+      if (!map) { el.setAttribute("class", "part"); svg.appendChild(el); continue; }
+      if (!map.split) { tag(el, map.z, map.s); svg.appendChild(el); continue; }
+      // Dividir con dos recortes según el eje
+      svg.appendChild(el); const bb = el.getBBox(); el.remove();
+      [map.split.a, map.split.b].forEach((s, i) => {
+        const id = `clip-${view}-${clipN++}`;
+        const cp = document.createElementNS(NS, "clipPath"); cp.id = id;
+        const r = document.createElementNS(NS, "rect");
+        if (map.split.axis === "y") {
+          const cut = bb.y + bb.height * map.split.at;
+          r.setAttribute("x", bb.x - 5); r.setAttribute("width", bb.width + 10);
+          r.setAttribute("y", i === 0 ? bb.y - 5 : cut); r.setAttribute("height", i === 0 ? cut - bb.y + 5 : bb.y + bb.height - cut + 5);
+        } else {   // "x-out": la mitad exterior (lejos del eje del cuerpo) es la subzona a
+          const cut = bb.x + bb.width * map.split.at;
+          const outerIsLeft = bb.x + bb.width / 2 < CENTER_X[view];
+          const leftPart = i === 0 ? outerIsLeft : !outerIsLeft;
+          r.setAttribute("y", bb.y - 5); r.setAttribute("height", bb.height + 10);
+          r.setAttribute("x", leftPart ? bb.x - 5 : cut); r.setAttribute("width", leftPart ? cut - bb.x + 5 : bb.x + bb.width - cut + 5);
+        }
+        cp.appendChild(r); defs.appendChild(cp);
+        const copy = el.cloneNode(); copy.setAttribute("clip-path", `url(#${id})`); tag(copy, map.z, s);
+        svg.appendChild(copy);
+      });
     }
-  });
-  return out;
+  }
 }
-document.getElementById("fig-front").innerHTML = figure("front");
-document.getElementById("fig-back").innerHTML = figure("back");
+function tag(el, z, s) {
+  el.setAttribute("class", "m"); el.dataset.z = z; el.dataset.s = s;
+  el.setAttribute("tabindex", "0"); el.setAttribute("role", "button");
+  el.setAttribute("aria-label", `${ZONES[z].nombre}: ${subName(z, s)}`);
+}
+build(document.getElementById("svg-front"), BODY_FRONT, "front");
+build(document.getElementById("svg-back"), BODY_BACK, "back");
 
-// ───────── Estado visual ─────────
+// ───────── Pintar estado ─────────
 function paint() {
-  const anyPrio = state.prio.size > 0;
-  document.querySelectorAll(".plate").forEach(el => {
+  document.querySelectorAll(".m").forEach(el => {
     const { z, s } = el.dataset;
-    const included = (state.sel[z] ?? []).includes(s);
-    const prio = state.prio.has(key(z, s));
-    const u = el.closest("svg").id.replace("fig-", "");
-    el.classList.toggle("on", included && !prio);
-    el.classList.toggle("prio", included && prio);
-    if (included) { el.setAttribute("fill", `url(#${prio ? "platePrio" : "plateOn"}-${u})`); el.setAttribute("filter", `url(#${prio ? "glowStrong" : "glow"}-${u})`); }
-    else { el.removeAttribute("fill"); el.removeAttribute("filter"); }
+    const inc = (state.sel[z] ?? []).includes(s);
+    // Estabilidad no tiene músculo visible: se refleja en el abdomen
+    const prio = state.prio.has(K(z, s)) || (z === "abdomen" && s === "recto" && state.prio.has("abdomen.estabilidad"));
+    el.classList.toggle("on", inc);
+    el.classList.toggle("prio", inc && prio);
   });
   document.querySelectorAll(".preset").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === state.preset)));
-  renderPanel();
+  renderPicked();
+  if (state.open) renderPop(state.open.z);
 }
-
 function samePreset() {
-  for (const [k, p] of Object.entries(PRESETS)) {
-    const a = JSON.stringify(Object.keys(p.sel).sort().map(z => [z, [...p.sel[z]].sort()]));
-    const b = JSON.stringify(Object.keys(state.sel).filter(z => state.sel[z].length).sort().map(z => [z, [...state.sel[z]].sort()]));
-    if (a === b) return k;
-  }
-  return null;
+  const norm = sel => JSON.stringify(Object.keys(sel).filter(z => sel[z]?.length).sort().map(z => [z, [...sel[z]].sort()]));
+  return Object.keys(PRESETS).find(k => norm(PRESETS[k].sel) === norm(state.sel)) ?? null;
 }
 
-function renderPanel() {
-  const panel = document.getElementById("panel");
+function renderPicked() {
   const zones = Object.keys(ZONES).filter(z => state.sel[z]?.length);
-  if (!zones.length) {
-    panel.innerHTML = `<div class="empty">Toca una zona en la figura o escoge un atajo.</div>`;
-    return;
-  }
-  const cards = zones.map(z => {
-    const subs = Object.entries(ZONES[z].subs).map(([s, label]) => {
-      const inc = state.sel[z].includes(s), pr = state.prio.has(key(z, s));
-      return `<div class="sub">
-        <button class="sub-toggle" data-act="sub" data-z="${z}" data-s="${s}" aria-pressed="${inc}">${label}</button>
-        <button class="star" data-act="prio" data-z="${z}" data-s="${s}" aria-pressed="${pr}" ${inc ? "" : "disabled"} aria-label="Priorizar ${label}">Prioridad</button>
-      </div>`;
-    }).join("");
-    return `<div class="zone-card ${state.active === z ? "active" : ""}">
-      <div class="zone-head"><h2>${ZONES[z].nombre}</h2><button class="x" data-act="remove" data-z="${z}">Quitar</button></div>
-      <div class="subs">${subs}</div>
+  const el = document.getElementById("picked");
+  if (!zones.length) { el.innerHTML = `<span class="muted">Toca una parte del cuerpo o escoge un atajo.</span>`; return; }
+  el.innerHTML = zones.map(z => {
+    const n = [...state.prio].filter(k => k.startsWith(z + ".")).length;
+    return `<button class="chip" data-z="${z}">${ZONES[z].nombre}${n ? `<small>${n === 1 ? "prioridad" : n + " prioridades"}</small>` : ""}</button>`;
+  }).join("") + `<button class="next">Continuar</button>`;
+}
+
+// ───────── Tarjeta flotante ─────────
+const pop = document.getElementById("pop");
+function renderPop(z) {
+  const subs = Object.entries(ZONES[z].subs).map(([s, label]) => {
+    const inc = (state.sel[z] ?? []).includes(s), pr = state.prio.has(K(z, s));
+    return `<div class="sub">
+      <button class="sub-toggle" data-act="sub" data-s="${s}" aria-pressed="${inc}">${label}</button>
+      <button class="star" data-act="prio" data-s="${s}" aria-pressed="${pr}" ${inc ? "" : "disabled"} aria-label="Priorizar ${label}">Prioridad</button>
     </div>`;
   }).join("");
-  const prioList = [...state.prio].map(k => { const [z, s] = k.split("."); return `${ZONES[z].nombre} · ${ZONES[z].subs[s]}`; });
-  panel.innerHTML = cards + `
-    <div class="summary">
-      <span class="label">Resumen</span>
-      <span><b>Zonas:</b> ${zones.map(z => ZONES[z].nombre).join(", ")}</span>
-      <span><b>Prioridad:</b> ${prioList.length ? prioList.join(", ") : "ninguna, se trabaja todo por igual"}</span>
-    </div>
-    <button class="next" id="next">Continuar</button>`;
+  pop.innerHTML = `<div class="pop-head"><h2>${ZONES[z].nombre}</h2><button class="pop-close" data-act="close" aria-label="Cerrar">Cerrar</button></div>
+    <div class="subs">${subs}</div>
+    <div class="pop-foot"><button class="link" data-act="remove">Quitar zona</button><button class="done" data-act="close">Listo</button></div>`;
+  pop.setAttribute("aria-label", `Opciones de ${ZONES[z].nombre}`);
 }
-
-// ───────── Interacción ─────────
-const presetsEl = document.getElementById("presets");
-presetsEl.innerHTML = Object.entries(PRESETS).map(([k, p]) =>
-  `<button class="preset" data-p="${k}" aria-pressed="false"><b>${p.nombre}</b><span>${p.desc}</span></button>`).join("");
-presetsEl.addEventListener("click", e => {
-  const b = e.target.closest(".preset"); if (!b) return;
-  const p = PRESETS[b.dataset.p];
-  if (state.preset === b.dataset.p) { state.sel = {}; state.preset = null; }
-  else { state.sel = structuredClone(p.sel); state.preset = b.dataset.p; }
-  state.prio = new Set([...state.prio].filter(k => { const [z, s] = k.split("."); return state.sel[z]?.includes(s); }));
-  state.active = null; paint();
-});
-
-function togglePlate(el) {
-  const { z, s } = el.dataset;
-  if (!state.sel[z]?.length) { state.sel[z] = [...ALL[z]]; state.active = z; }
-  else if (!state.sel[z].includes(s)) { state.sel[z].push(s); state.active = z; }
-  else if (state.active === z) { delete state.sel[z]; state.prio = new Set([...state.prio].filter(k => !k.startsWith(z + "."))); state.active = null; }
-  else state.active = z;
-  state.preset = samePreset(); paint();
+function openPop(z, x, y) {
+  state.open = { z, x, y };
+  renderPop(z); pop.hidden = false;
+  if (matchMedia("(max-width: 640px)").matches) { pop.style.left = ""; pop.style.top = ""; return; }
+  // Junto al puntero: a la derecha si cabe, si no a la izquierda; siempre dentro de la pantalla
+  const w = pop.offsetWidth, h = pop.offsetHeight, pad = 12;
+  let left = x + 18; if (left + w > innerWidth - pad) left = x - w - 18;
+  let top = y - 40; top = Math.max(pad, Math.min(top, innerHeight - h - pad));
+  pop.style.left = `${Math.max(pad, left)}px`; pop.style.top = `${top}px`;
 }
-document.querySelectorAll("svg").forEach(svg => {
-  svg.addEventListener("click", e => { const el = e.target.closest(".plate"); if (el) togglePlate(el); });
-  svg.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("plate")) { e.preventDefault(); togglePlate(e.target); } });
-  svg.addEventListener("pointerover", e => {
-    const el = e.target.closest(".plate"); if (!el) return;
-    document.getElementById("hoverName").textContent = el.dataset.name;
-    document.querySelectorAll(`.plate[data-z="${el.dataset.z}"][data-s="${el.dataset.s}"]`).forEach(p => p.classList.add("hover"));
-  });
-  svg.addEventListener("pointerout", e => {
-    const el = e.target.closest(".plate"); if (!el) return;
-    document.querySelectorAll(".plate.hover").forEach(p => p.classList.remove("hover"));
-    document.getElementById("hoverName").textContent = "";
-  });
-});
+function closePop() { state.open = null; pop.hidden = true; }
+const dropPrio = z => { state.prio = new Set([...state.prio].filter(k => !k.startsWith(z + "."))); };
 
-document.getElementById("panel").addEventListener("click", e => {
-  const b = e.target.closest("[data-act]"); if (!b) return;
-  const { z, s } = b.dataset;
+pop.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b || !state.open) return;
+  const z = state.open.z, s = b.dataset.s;
+  if (b.dataset.act === "close") return closePop();
+  if (b.dataset.act === "remove") { delete state.sel[z]; dropPrio(z); state.preset = samePreset(); closePop(); return paint(); }
   if (b.dataset.act === "sub") {
-    const list = state.sel[z];
-    if (list.includes(s)) { state.sel[z] = list.filter(x => x !== s); state.prio.delete(key(z, s)); if (!state.sel[z].length) delete state.sel[z]; }
+    const list = state.sel[z] ??= [];
+    if (list.includes(s)) { state.sel[z] = list.filter(x => x !== s); state.prio.delete(K(z, s)); if (!state.sel[z].length) delete state.sel[z]; }
     else list.push(s);
   }
-  if (b.dataset.act === "prio") state.prio.has(key(z, s)) ? state.prio.delete(key(z, s)) : state.prio.add(key(z, s));
-  if (b.dataset.act === "remove") { delete state.sel[z]; state.prio = new Set([...state.prio].filter(k => !k.startsWith(z + "."))); }
-  if (b.id === "next") return;
-  state.active = z ?? state.active; state.preset = samePreset(); paint();
+  if (b.dataset.act === "prio") state.prio.has(K(z, s)) ? state.prio.delete(K(z, s)) : state.prio.add(K(z, s));
+  state.preset = samePreset(); paint();
+});
+
+// ───────── Interacción con la figura ─────────
+const tip = document.getElementById("tip");
+function choose(el, x, y) {
+  const { z } = el.dataset;
+  if (!state.sel[z]?.length) state.sel[z] = [...ALL[z]];          // tocar una zona la incluye completa
+  state.preset = samePreset(); paint(); openPop(z, x, y);
+}
+document.querySelectorAll("svg").forEach(svg => {
+  svg.addEventListener("click", e => { const el = e.target.closest(".m"); if (el) { e.stopPropagation(); choose(el, e.clientX, e.clientY); } });
+  svg.addEventListener("keydown", e => {
+    if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("m")) {
+      e.preventDefault(); const r = e.target.getBoundingClientRect(); choose(e.target, r.right, r.top + r.height / 2);
+    }
+  });
+  svg.addEventListener("pointermove", e => {
+    const el = e.target.closest(".m");
+    document.querySelectorAll(".m.hover").forEach(p => p.classList.remove("hover"));
+    if (!el || e.pointerType !== "mouse") { tip.hidden = true; return; }
+    document.querySelectorAll(`.m[data-z="${el.dataset.z}"]`).forEach(p => p.classList.add("hover"));
+    tip.textContent = `${ZONES[el.dataset.z].nombre} · ${subName(el.dataset.z, el.dataset.s)}`;
+    tip.style.left = `${e.clientX}px`; tip.style.top = `${e.clientY}px`; tip.hidden = false;
+  });
+  svg.addEventListener("pointerleave", () => { tip.hidden = true; document.querySelectorAll(".m.hover").forEach(p => p.classList.remove("hover")); });
+});
+document.addEventListener("click", e => { if (state.open && !pop.contains(e.target) && !e.target.closest(".chip")) closePop(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+
+document.getElementById("picked").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  e.stopPropagation(); const r = c.getBoundingClientRect(); openPop(c.dataset.z, r.left + r.width / 2, r.top - 120);
+});
+
+// Atajos
+const presetsEl = document.getElementById("presets");
+presetsEl.insertAdjacentHTML("beforeend", Object.entries(PRESETS).map(([k, p]) =>
+  `<button class="preset" data-p="${k}" aria-pressed="false">${p.nombre}</button>`).join(""));
+presetsEl.addEventListener("click", e => {
+  const b = e.target.closest(".preset"); if (!b) return;
+  if (state.preset === b.dataset.p) { state.sel = {}; state.preset = null; }
+  else { state.sel = structuredClone(PRESETS[b.dataset.p].sel); state.preset = b.dataset.p; }
+  state.prio = new Set([...state.prio].filter(k => { const [z, s] = k.split("."); return state.sel[z]?.includes(s); }));
+  closePop(); paint();
 });
 
 document.querySelector(".toggle").addEventListener("click", e => {
@@ -360,8 +348,6 @@ document.querySelector(".toggle").addEventListener("click", e => {
   document.querySelectorAll(".toggle button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
 });
 
-// Estado inicial de ejemplo: Push con prioridad en pecho superior
-state.sel = structuredClone(PRESETS.push.sel); state.preset = "push"; state.prio.add("pecho.superior");
 paint();
 </script>
 </body>
