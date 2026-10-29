@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Selector de Zonas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Figura sintética de paneles facetados: chasis en grafito, zonas musculares como placas que se iluminan en latón */
+:root {
+  --bg: #f1efea; --surface: #ffffff; --line: #d6d1c7; --fg: #1b1c1d; --muted: #6b6a64; --accent: #9a7428; --accent-fg: #fff;
+  --chassis: #dcd8cf; --chassis-edge: #b9b3a6; --plate: #c9c4b8; --plate-edge: #a29b8c; --plate-hover: #b8b1a2;
+  --glow: #b8892e; --glow-strong: #e0a93a; --halo: rgb(154 116 40 / .14); --seam: #f7f5f0;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d0f10; --surface: #15181a; --line: #2a2f33; --fg: #ece8e1; --muted: #9b9a93; --accent: #c9a25b; --accent-fg: #15130f;
+  --chassis: #1b1f22; --chassis-edge: #3a4248; --plate: #22282c; --plate-edge: #46525a; --plate-hover: #2d363c;
+  --glow: #c9a25b; --glow-strong: #f2c879; --halo: rgb(201 162 91 / .16); --seam: #0d0f10; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0d0f10; --surface: #15181a; --line: #2a2f33; --fg: #ece8e1; --muted: #9b9a93; --accent: #c9a25b; --accent-fg: #15130f;
+  --chassis: #1b1f22; --chassis-edge: #3a4248; --plate: #22282c; --plate-edge: #46525a; --plate-hover: #2d363c;
+  --glow: #c9a25b; --glow-strong: #f2c879; --halo: rgb(201 162 91 / .16); --seam: #0d0f10; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body);
+  padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1; text-transform: uppercase; margin: 0; }
+h2 { font-family: var(--display); font-weight: 800; font-size: 1.25rem; text-transform: uppercase; letter-spacing: .03em; margin: 0; }
+.label { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+
+.layout { display: grid; grid-template-columns: 200px minmax(0, 1fr) 320px; gap: 22px; align-items: start; }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* Atajos */
+.presets { display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 1000px) { .presets { flex-direction: row; flex-wrap: wrap; } }
+.preset { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.preset b { font-family: var(--display); font-weight: 800; font-size: 1.15rem; text-transform: uppercase; letter-spacing: .04em; }
+.preset span { font-size: .8rem; color: var(--muted); }
+.preset[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+@media (max-width: 1000px) { .preset { padding: 8px 12px; } .preset span { display: none; } }
+
+/* Figura */
+.stage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.views { display: flex; gap: 8px; justify-content: center; width: 100%; }
+.figure-wrap { position: relative; flex: 1 1 0; max-width: 300px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.figure-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+.view-name { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.toggle { display: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.toggle button { border: 0; background: transparent; padding: 8px 16px; font-weight: 600; }
+.toggle button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+@media (max-width: 560px) {
+  .toggle { display: inline-flex; }
+  .figure-wrap { max-width: 320px; }
+  .stage[data-view="front"] .figure-wrap[data-view="back"], .stage[data-view="back"] .figure-wrap[data-view="front"] { display: none; }
+}
+.hover-name { min-height: 1.6em; font-family: var(--display); font-weight: 700; font-size: 1.2rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+
+.floor { fill: none; stroke: var(--chassis-edge); stroke-width: 1; opacity: .5; }
+.chassis { fill: var(--chassis); stroke: var(--chassis-edge); stroke-width: 1; stroke-linejoin: round; }
+.visor { fill: var(--glow-strong); }
+.seam { stroke: var(--seam); stroke-width: 1.4; fill: none; }
+.plate:not([fill]) { fill: var(--plate); }
+.plate { stroke: var(--plate-edge); stroke-width: 1; stroke-linejoin: round; cursor: pointer;
+  transition: fill .25s ease, stroke .25s ease, filter .25s ease; }
+.plate:not([fill]):hover, .plate.hover:not([fill]) { fill: var(--plate-hover); }
+.plate:hover, .plate.hover { stroke: var(--glow-strong); }
+.plate.on { stroke: var(--glow); }
+.plate.prio { stroke-width: 1.6; animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .78; } }
+.plate.dim { opacity: .5; }
+
+/* Panel de zonas */
+.panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.zone-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.zone-card.active { border-color: var(--accent); }
+.zone-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.x { border: 0; background: transparent; color: var(--muted); font-size: .85rem; padding: 4px 6px; }
+.subs { display: flex; flex-direction: column; gap: 6px; }
+.sub { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.sub-toggle { text-align: left; border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 7px 10px; font-weight: 600; font-size: .92rem; display: flex; gap: 8px; align-items: center; }
+.sub-toggle::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--muted); flex: none; }
+.sub-toggle[aria-pressed="true"]::before { background: var(--accent); border-color: var(--accent); }
+.sub-toggle[aria-pressed="false"] { color: var(--muted); }
+.star { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 7px 10px; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.star[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.hint { font-size: .85rem; color: var(--muted); margin: 0; }
+.empty { border: 1px dashed var(--line); border-radius: 10px; padding: 20px 16px; text-align: center; color: var(--muted); }
+.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: .92rem; display: flex; flex-direction: column; gap: 6px; }
+.summary b { color: var(--fg); }
+.next { border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg); padding: 12px 20px; font-family: var(--display); font-weight: 800; font-size: 1.1rem; letter-spacing: .08em; text-transform: uppercase; }
+.next:disabled { opacity: .4; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .plate { transition: none; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <span class="label">Paso 2 de 4 · Zona</span>
+      <h1>¿Qué vas a trabajar?</h1>
+    </div>
+    <span class="muted">Toca una zona o usa un atajo. Prioridad es opcional.</span>
+  </div>
+
+  <div class="layout">
+    <div class="presets" id="presets" role="group" aria-label="Atajos"></div>
+
+    <div class="stage" id="stage" data-view="front">
+      <div class="toggle" role="group" aria-label="Vista">
+        <button data-view="front" aria-pressed="true">Frente</button>
+        <button data-view="back" aria-pressed="false">Espalda</button>
+      </div>
+      <div class="views">
+        <div class="figure-wrap" data-view="front"><svg id="fig-front" viewBox="0 0 300 640" role="img" aria-label="Figura de frente"></svg><span class="view-name">Frente</span></div>
+        <div class="figure-wrap" data-view="back"><svg id="fig-back" viewBox="0 0 300 640" role="img" aria-label="Figura de espalda"></svg><span class="view-name">Espalda</span></div>
+      </div>
+      <div class="hover-name" id="hoverName" aria-live="polite"></div>
+    </div>
+
+    <div class="panel" id="panel"></div>
+  </div>
+</div>
+
+<script>
+// ───────── Datos: zonas, subzonas y atajos (los mismos que usará el generador) ─────────
+const ZONES = {
+  pecho:   { nombre: "Pecho",   subs: { superior: "Superior", medio: "Medio e inferior" } },
+  espalda: { nombre: "Espalda", subs: { dorsales: "Dorsales (ancho)", alta: "Espalda alta (grosor)", lumbar: "Lumbar" } },
+  hombros: { nombre: "Hombros", subs: { anterior: "Anterior", lateral: "Lateral", posterior: "Posterior" } },
+  brazos:  { nombre: "Brazos",  subs: { biceps: "Bíceps", triceps: "Tríceps", antebrazo: "Antebrazo" } },
+  abdomen: { nombre: "Abdomen", subs: { recto: "Recto abdominal", oblicuos: "Oblicuos", estabilidad: "Estabilidad (core profundo)" } },
+  piernas: { nombre: "Piernas", subs: { cuadriceps: "Cuádriceps", isquios: "Isquiotibiales", gluteos: "Glúteos", pantorrillas: "Pantorrillas", aductores: "Aductores" } },
+};
+const ALL = Object.fromEntries(Object.entries(ZONES).map(([z, v]) => [z, Object.keys(v.subs)]));
+const PRESETS = {
+  push:     { nombre: "Push",  desc: "Pecho, hombros, tríceps", sel: { pecho: ["superior", "medio"], hombros: ["anterior", "lateral"], brazos: ["triceps"] } },
+  pull:     { nombre: "Pull",  desc: "Espalda, hombro posterior, bíceps", sel: { espalda: ["dorsales", "alta"], hombros: ["posterior"], brazos: ["biceps", "antebrazo"] } },
+  piernas:  { nombre: "Piernas", desc: "Todo el tren inferior", sel: { piernas: ALL.piernas } },
+  core:     { nombre: "Core",  desc: "Abdomen y lumbar", sel: { abdomen: ALL.abdomen, espalda: ["lumbar"] } },
+  completo: { nombre: "Cuerpo completo", desc: "Todas las zonas", sel: ALL },
+};
+
+// ───────── Geometría: paneles del lado derecho de la figura; el izquierdo se refleja ─────────
+const M = pts => pts.map(([x, y]) => [300 - x, y]);
+const sym = half => [...half, ...M(half).reverse()];            // contorno simétrico a partir de la mitad
+
+const HEAD = sym([[150, 22], [166, 26], [177, 40], [179, 60], [173, 80], [161, 94], [150, 98]]);
+const NECK = sym([[150, 98], [160, 97], [163, 113], [150, 114]]);
+const ARM_CHASSIS = [   // codo, mano
+  [[198, 226], [212, 224], [216, 232], [214, 236], [200, 236]],
+  [[203, 302], [214, 300], [221, 320], [216, 338], [205, 338], [200, 318]],
+];
+const LEG_CHASSIS = [   // rodilla, pie
+  [[170, 420], [190, 417], [193, 436], [186, 448], [172, 448], [167, 433]],
+  [[172, 564], [187, 563], [196, 582], [192, 594], [166, 594], [168, 578]],
+];
+const PELVIS = sym([[150, 300], [162, 296], [184, 266], [192, 284], [186, 300], [170, 313], [150, 318]]);
+const PELVIS_BACK = sym([[150, 278], [178, 272], [186, 278], [178, 276], [150, 282]]);
+
+const REGIONS = [
+  // Frente
+  { v: "front", z: "espalda", s: "alta",       name: "Trapecio",          pts: [[158, 104], [192, 120], [176, 124], [164, 118]] },
+  { v: "front", z: "hombros", s: "lateral",    name: "Hombro lateral",    pts: [[192, 120], [212, 128], [220, 150], [214, 174], [205, 160], [200, 138]] },
+  { v: "front", z: "hombros", s: "anterior",   name: "Hombro anterior",   pts: [[176, 124], [192, 120], [200, 138], [205, 160], [197, 166], [186, 146]] },
+  { v: "front", z: "pecho",   s: "superior",   name: "Pecho superior",    pts: [[153, 122], [176, 124], [186, 146], [153, 146]] },
+  { v: "front", z: "pecho",   s: "medio",      name: "Pecho medio e inferior", pts: [[153, 149], [186, 149], [196, 167], [186, 180], [167, 186], [153, 182]] },
+  { v: "front", z: "brazos",  s: "biceps",     name: "Bíceps",            pts: [[205, 163], [214, 176], [216, 204], [211, 222], [200, 222], [196, 202], [198, 170]] },
+  { v: "front", z: "brazos",  s: "antebrazo",  name: "Antebrazo",         pts: [[200, 239], [214, 238], [222, 260], [222, 290], [213, 299], [204, 298], [198, 264]] },
+  { v: "front", z: "abdomen", s: "recto",      name: "Recto abdominal",   pts: [[153, 189], [169, 186], [171, 209], [153, 211]] },
+  { v: "front", z: "abdomen", s: "recto",      name: "Recto abdominal",   pts: [[153, 214], [171, 212], [172, 236], [153, 238]] },
+  { v: "front", z: "abdomen", s: "recto",      name: "Recto abdominal",   pts: [[153, 241], [172, 239], [170, 264], [153, 268]] },
+  { v: "front", z: "abdomen", s: "estabilidad", name: "Core profundo",    pts: [[153, 271], [169, 267], [162, 293], [153, 297]] },
+  { v: "front", z: "abdomen", s: "oblicuos",   name: "Oblicuos",          pts: [[172, 186], [186, 182], [194, 200], [192, 232], [184, 262], [175, 264], [175, 238], [174, 210]] },
+  { v: "front", z: "piernas", s: "cuadriceps", name: "Cuádriceps",        pts: [[172, 314], [186, 302], [194, 292], [198, 330], [196, 380], [188, 414], [176, 417], [171, 390], [167, 350]] },
+  { v: "front", z: "piernas", s: "aductores",  name: "Aductores",         pts: [[153, 321], [169, 316], [164, 350], [168, 388], [160, 390], [155, 352]] },
+  { v: "front", z: "piernas", s: "pantorrillas", name: "Pierna inferior", pts: [[172, 451], [187, 451], [194, 472], [192, 520], [184, 559], [175, 559], [170, 520], [168, 480]] },
+  // Espalda
+  { v: "back", z: "espalda",  s: "alta",       name: "Espalda alta",      pts: [[153, 101], [160, 104], [192, 120], [186, 138], [171, 158], [153, 172]] },
+  { v: "back", z: "hombros",  s: "posterior",  name: "Hombro posterior",  pts: [[192, 120], [212, 128], [220, 150], [214, 174], [202, 160], [189, 140]] },
+  { v: "back", z: "espalda",  s: "alta",       name: "Espalda alta",      pts: [[153, 176], [170, 162], [163, 212], [153, 214]] },
+  { v: "back", z: "espalda",  s: "dorsales",   name: "Dorsales",          pts: [[173, 160], [188, 142], [198, 166], [197, 196], [189, 226], [174, 250], [166, 212]] },
+  { v: "back", z: "espalda",  s: "lumbar",     name: "Lumbar",            pts: [[153, 217], [164, 215], [172, 250], [176, 270], [153, 275]] },
+  { v: "back", z: "brazos",   s: "triceps",    name: "Tríceps",           pts: [[204, 162], [214, 176], [216, 204], [211, 222], [200, 222], [196, 202], [198, 168]] },
+  { v: "back", z: "brazos",   s: "antebrazo",  name: "Antebrazo",         pts: [[200, 239], [214, 238], [222, 260], [222, 290], [213, 299], [204, 298], [198, 264]] },
+  { v: "back", z: "piernas",  s: "gluteos",    name: "Glúteos",           pts: [[153, 285], [178, 279], [192, 288], [196, 314], [184, 330], [163, 332], [153, 326]] },
+  { v: "back", z: "piernas",  s: "isquios",    name: "Isquiotibiales",    pts: [[164, 336], [185, 334], [196, 318], [196, 362], [190, 410], [176, 417], [169, 390], [164, 360]] },
+  { v: "back", z: "piernas",  s: "aductores",  name: "Aductores",         pts: [[153, 330], [161, 336], [161, 360], [166, 390], [158, 392], [155, 352]] },
+  { v: "back", z: "piernas",  s: "pantorrillas", name: "Pantorrillas",    pts: [[172, 451], [189, 449], [197, 476], [195, 510], [185, 540], [175, 548], [169, 510], [167, 476]] },
+];
+
+// Contorno del torso (chasis detrás de las placas)
+const TORSO_FRONT = sym([[150, 112], [163, 113], [192, 120], [196, 168], [196, 200], [192, 236], [186, 266], [184, 268], [150, 300]]);
+const TORSO_BACK = sym([[150, 98], [160, 100], [192, 120], [197, 166], [198, 196], [190, 228], [178, 272], [150, 280]]);
+const UPPER_ARM = [[192, 120], [212, 128], [220, 150], [216, 204], [212, 224], [198, 226], [196, 168]];
+const FOREARM = [[200, 236], [214, 236], [222, 258], [223, 292], [214, 301], [203, 302], [198, 264]];
+const THIGH = [[150, 318], [170, 313], [192, 284], [198, 330], [196, 380], [190, 418], [170, 420], [160, 392], [153, 352]];
+const SHIN = [[168, 448], [188, 448], [196, 474], [194, 520], [186, 562], [172, 563], [169, 520], [166, 476]];
+
+// ───────── Estado ─────────
+const state = { sel: {}, prio: new Set(), active: null, preset: null };   // sel: zona → [subzonas incluidas]
+const key = (z, s) => `${z}.${s}`;
+
+// ───────── Render SVG ─────────
+const P = pts => pts.map(p => p.join(",")).join(" ");
+function figure(view) {
+  const u = view;
+  const defs = `<defs>
+    <radialGradient id="haloG-${u}" cx="50%" cy="42%" r="55%"><stop offset="0" stop-color="var(--glow)" stop-opacity=".18"/><stop offset="1" stop-color="var(--glow)" stop-opacity="0"/></radialGradient>
+    <linearGradient id="plateOn-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--glow)" stop-opacity=".75"/><stop offset="1" stop-color="var(--glow)" stop-opacity=".45"/></linearGradient>
+    <linearGradient id="platePrio-${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3d6"/><stop offset=".35" stop-color="var(--glow-strong)"/><stop offset="1" stop-color="var(--glow)"/></linearGradient>
+    <filter id="glow-${u}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glowStrong-${u}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="soft-${u}"><feGaussianBlur stdDeviation="1.2"/></filter>
+  </defs>`;
+  const both = pts => `<polygon class="chassis" points="${P(pts)}"/><polygon class="chassis" points="${P(M(pts))}"/>`;
+  let out = defs;
+  out += `<ellipse class="halo" cx="150" cy="280" rx="140" ry="270" fill="url(#haloG-${u})"/>`;
+  out += `<ellipse class="floor" cx="150" cy="600" rx="70" ry="10"/><ellipse class="floor" cx="150" cy="600" rx="110" ry="16" opacity=".25"/>`;
+  out += `<polygon class="chassis" points="${P(view === "front" ? TORSO_FRONT : TORSO_BACK)}"/>`;
+  out += both(UPPER_ARM) + both(FOREARM) + both(THIGH) + both(SHIN);
+  out += ARM_CHASSIS.map(both).join("") + LEG_CHASSIS.map(both).join("");
+  out += `<polygon class="chassis" points="${P(view === "front" ? PELVIS : PELVIS_BACK)}"/>`;
+  out += `<polygon class="chassis" points="${P(NECK)}"/><polygon class="chassis" points="${P(HEAD)}"/>`;
+  // Rasgos: visor y líneas de ensamble (diseño propio)
+  if (view === "front") {
+    out += `<rect class="visor" x="131" y="55.5" width="38" height="4" rx="2" filter="url(#glow-${u})"/>`;
+    out += `<polyline class="seam" points="150,26 150,52"/><polyline class="seam" points="142,74 150,80 158,74"/>`;
+  } else {
+    out += `<polyline class="seam" points="136,40 150,34 164,40"/><polyline class="seam" points="150,60 150,94"/>`;
+  }
+  REGIONS.filter(r => r.v === view).forEach((r, i) => {
+    for (const pts of [r.pts, M(r.pts)]) {
+      out += `<polygon class="plate" data-z="${r.z}" data-s="${r.s}" data-name="${r.name}" points="${P(pts)}" tabindex="0" role="button" aria-label="${ZONES[r.z].nombre}: ${r.name}"><title>${r.name}</title></polygon>`;
+    }
+  });
+  return out;
+}
+document.getElementById("fig-front").innerHTML = figure("front");
+document.getElementById("fig-back").innerHTML = figure("back");
+
+// ───────── Estado visual ─────────
+function paint() {
+  const anyPrio = state.prio.size > 0;
+  document.querySelectorAll(".plate").forEach(el => {
+    const { z, s } = el.dataset;
+    const included = (state.sel[z] ?? []).includes(s);
+    const prio = state.prio.has(key(z, s));
+    const u = el.closest("svg").id.replace("fig-", "");
+    el.classList.toggle("on", included && !prio);
+    el.classList.toggle("prio", included && prio);
+    if (included) { el.setAttribute("fill", `url(#${prio ? "platePrio" : "plateOn"}-${u})`); el.setAttribute("filter", `url(#${prio ? "glowStrong" : "glow"}-${u})`); }
+    else { el.removeAttribute("fill"); el.removeAttribute("filter"); }
+  });
+  document.querySelectorAll(".preset").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === state.preset)));
+  renderPanel();
+}
+
+function samePreset() {
+  for (const [k, p] of Object.entries(PRESETS)) {
+    const a = JSON.stringify(Object.keys(p.sel).sort().map(z => [z, [...p.sel[z]].sort()]));
+    const b = JSON.stringify(Object.keys(state.sel).filter(z => state.sel[z].length).sort().map(z => [z, [...state.sel[z]].sort()]));
+    if (a === b) return k;
+  }
+  return null;
+}
+
+function renderPanel() {
+  const panel = document.getElementById("panel");
+  const zones = Object.keys(ZONES).filter(z => state.sel[z]?.length);
+  if (!zones.length) {
+    panel.innerHTML = `<div class="empty">Toca una zona en la figura o escoge un atajo.</div>`;
+    return;
+  }
+  const cards = zones.map(z => {
+    const subs = Object.entries(ZONES[z].subs).map(([s, label]) => {
+      const inc = state.sel[z].includes(s), pr = state.prio.has(key(z, s));
+      return `<div class="sub">
+        <button class="sub-toggle" data-act="sub" data-z="${z}" data-s="${s}" aria-pressed="${inc}">${label}</button>
+        <button class="star" data-act="prio" data-z="${z}" data-s="${s}" aria-pressed="${pr}" ${inc ? "" : "disabled"} aria-label="Priorizar ${label}">Prioridad</button>
+      </div>`;
+    }).join("");
+    return `<div class="zone-card ${state.active === z ? "active" : ""}">
+      <div class="zone-head"><h2>${ZONES[z].nombre}</h2><button class="x" data-act="remove" data-z="${z}">Quitar</button></div>
+      <div class="subs">${subs}</div>
+    </div>`;
+  }).join("");
+  const prioList = [...state.prio].map(k => { const [z, s] = k.split("."); return `${ZONES[z].nombre} · ${ZONES[z].subs[s]}`; });
+  panel.innerHTML = cards + `
+    <div class="summary">
+      <span class="label">Resumen</span>
+      <span><b>Zonas:</b> ${zones.map(z => ZONES[z].nombre).join(", ")}</span>
+      <span><b>Prioridad:</b> ${prioList.length ? prioList.join(", ") : "ninguna, se trabaja todo por igual"}</span>
+    </div>
+    <button class="next" id="next">Continuar</button>`;
+}
+
+// ───────── Interacción ─────────
+const presetsEl = document.getElementById("presets");
+presetsEl.innerHTML = Object.entries(PRESETS).map(([k, p]) =>
+  `<button class="preset" data-p="${k}" aria-pressed="false"><b>${p.nombre}</b><span>${p.desc}</span></button>`).join("");
+presetsEl.addEventListener("click", e => {
+  const b = e.target.closest(".preset"); if (!b) return;
+  const p = PRESETS[b.dataset.p];
+  if (state.preset === b.dataset.p) { state.sel = {}; state.preset = null; }
+  else { state.sel = structuredClone(p.sel); state.preset = b.dataset.p; }
+  state.prio = new Set([...state.prio].filter(k => { const [z, s] = k.split("."); return state.sel[z]?.includes(s); }));
+  state.active = null; paint();
+});
+
+function togglePlate(el) {
+  const { z, s } = el.dataset;
+  if (!state.sel[z]?.length) { state.sel[z] = [...ALL[z]]; state.active = z; }
+  else if (!state.sel[z].includes(s)) { state.sel[z].push(s); state.active = z; }
+  else if (state.active === z) { delete state.sel[z]; state.prio = new Set([...state.prio].filter(k => !k.startsWith(z + "."))); state.active = null; }
+  else state.active = z;
+  state.preset = samePreset(); paint();
+}
+document.querySelectorAll("svg").forEach(svg => {
+  svg.addEventListener("click", e => { const el = e.target.closest(".plate"); if (el) togglePlate(el); });
+  svg.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("plate")) { e.preventDefault(); togglePlate(e.target); } });
+  svg.addEventListener("pointerover", e => {
+    const el = e.target.closest(".plate"); if (!el) return;
+    document.getElementById("hoverName").textContent = el.dataset.name;
+    document.querySelectorAll(`.plate[data-z="${el.dataset.z}"][data-s="${el.dataset.s}"]`).forEach(p => p.classList.add("hover"));
+  });
+  svg.addEventListener("pointerout", e => {
+    const el = e.target.closest(".plate"); if (!el) return;
+    document.querySelectorAll(".plate.hover").forEach(p => p.classList.remove("hover"));
+    document.getElementById("hoverName").textContent = "";
+  });
+});
+
+document.getElementById("panel").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const { z, s } = b.dataset;
+  if (b.dataset.act === "sub") {
+    const list = state.sel[z];
+    if (list.includes(s)) { state.sel[z] = list.filter(x => x !== s); state.prio.delete(key(z, s)); if (!state.sel[z].length) delete state.sel[z]; }
+    else list.push(s);
+  }
+  if (b.dataset.act === "prio") state.prio.has(key(z, s)) ? state.prio.delete(key(z, s)) : state.prio.add(key(z, s));
+  if (b.dataset.act === "remove") { delete state.sel[z]; state.prio = new Set([...state.prio].filter(k => !k.startsWith(z + "."))); }
+  if (b.id === "next") return;
+  state.active = z ?? state.active; state.preset = samePreset(); paint();
+});
+
+document.querySelector(".toggle").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.getElementById("stage").dataset.view = b.dataset.view;
+  document.querySelectorAll(".toggle button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+});
+
+// Estado inicial de ejemplo: Push con prioridad en pecho superior
+state.sel = structuredClone(PRESETS.push.sel); state.preset = "push"; state.prio.add("pecho.superior");
+paint();
+</script>
+</body>
+</html>
