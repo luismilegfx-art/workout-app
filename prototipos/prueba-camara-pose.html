@@ -127,8 +127,47 @@ const HINTS = {
 // ---------- Estado por ejercicio ----------
 let reps = 0, phase = "up", smooth = {}, lastSpoken = "", lastSpokenAt = 0;
 let repWarnings = new Set(), triBaseline = null;
+// Control de calidad: solo se cuenta con el cuerpo completo y tras una posición inicial estable
+let ready = false, readySince = null, lostSince = null, phaseStart = 0;
+const MIN_VIS = 0.65, READY_MS = 1000, LOST_MS = 500, MIN_DOWN_MS = 500;
+const LEAN_MAX = 45; // grados del torso respecto a la vertical
+const REQUIRED = { squat: s => [s.sh, s.hip, s.kn, s.an], tri: s => [s.sh, s.el, s.wr], free: () => [] };
 function ema(key, v, a = 0.35){ smooth[key] = smooth[key] == null ? v : smooth[key] + a * (v - smooth[key]); return smooth[key]; }
-function resetState(){ reps = 0; phase = "up"; smooth = {}; repWarnings = new Set(); triBaseline = null; $("reps").textContent = "0"; }
+function resetState(){
+  reps = 0; phase = "up"; smooth = {}; repWarnings = new Set(); triBaseline = null;
+  ready = false; readySince = null; lostSince = null; $("reps").textContent = "0";
+}
+function inFrame(p){ return (p.visibility ?? 0) > MIN_VIS && p.x > 0.02 && p.x < 0.98 && p.y > 0.02 && p.y < 0.98; }
+function waitingChecks(text){ setChecks([["Estado", "na", text]]); }
+
+function markLost(now){
+  if (lostSince == null) lostSince = now;
+  if (now - lostSince < LOST_MS) return;
+  ready = false; readySince = null; phase = "up"; smooth = {}; triBaseline = null;
+  const msg = mode === "squat" ? "Aléjate, necesito verte completo" : "Acomódate, necesito ver hombro, codo y muñeca";
+  setCue(msg, "warn"); say(msg); waitingChecks("en pausa");
+}
+
+// Devuelve true cuando se puede evaluar el movimiento
+function gate(lm, s, now){
+  if (mode === "free") return true;
+  if (!REQUIRED[mode](s).every(i => inFrame(lm[i]))) { markLost(now); return false; }
+  lostSince = null;
+  if (ready) return true;
+  const startOk = mode === "squat"
+    ? angle(lm[s.hip], lm[s.kn], lm[s.an]) > 160
+    : angle(lm[s.sh], lm[s.el], lm[s.wr]) > 150;
+  if (!startOk) {
+    readySince = null;
+    setCue(mode === "squat" ? "Ponte de pie para empezar" : "Extiende el brazo para empezar", "");
+  } else {
+    if (readySince == null) readySince = now;
+    if (now - readySince >= READY_MS) { ready = true; phase = "up"; setCue("Listo, empieza", "ok"); say("Listo, empieza"); }
+    else setCue("Quédate quieto…", "");
+  }
+  waitingChecks(ready ? "listo" : "preparando");
+  return false;
+}
 
 function angle(a, b, c){ // ángulo en b
   const ab = [a.x - b.x, a.y - b.y], cb = [c.x - b.x, c.y - b.y];
@@ -157,26 +196,29 @@ function setChecks(items){
 }
 
 // ---------- Reglas ----------
-function evalSquat(lm, s){
+function evalSquat(lm, s, now){
   const knee = ema("knee", angle(lm[s.hip], lm[s.kn], lm[s.an]));
   const trunk = ema("trunk", fromVertical(lm[s.sh], lm[s.hip]));
   const depthGap = lm[s.kn].y - lm[s.hip].y; // >0: cadera por encima de la rodilla (imagen con y hacia abajo)
   $("angle").textContent = Math.round(knee) + "°"; $("angleLbl").textContent = "Ángulo rodilla";
 
   const deep = depthGap < 0.03;
-  const leanBad = trunk > 50;
-  if (phase === "up" && knee < 110) { phase = "down"; repWarnings = new Set(); }
+  const leanBad = trunk > LEAN_MAX;
+  if (phase === "up" && knee < 110) { phase = "down"; phaseStart = now; repWarnings = new Set(); }
   if (phase === "down") {
-    if (leanBad) repWarnings.add("lean");
+    if (leanBad && !repWarnings.has("lean")) { repWarnings.add("lean"); setCue("Pecho arriba", "warn"); say("Pecho arriba"); }
     if (knee < 100 && deep) repWarnings.add("deepOK");
     if (knee > 160) {
-      phase = "up"; reps++; $("reps").textContent = reps;
-      if (!repWarnings.has("deepOK")) { setCue("Baja más", "warn"); say("Baja un poco más"); }
-      else if (repWarnings.has("lean")) { setCue("Pecho arriba", "warn"); say("Mantén el pecho arriba"); }
-      else { setCue("Buena repetición", "ok"); say(String(reps)); }
+      phase = "up";
+      if (now - phaseStart < MIN_DOWN_MS) { setCue("Muy rápido, no cuenta", "warn"); }
+      else {
+        reps++; $("reps").textContent = reps;
+        if (!repWarnings.has("deepOK")) { setCue("Baja más", "warn"); say("Baja un poco más"); }
+        else if (repWarnings.has("lean")) { setCue("Cuenta, pero mantén el pecho arriba", "warn"); say(String(reps)); }
+        else { setCue("Buena repetición", "ok"); say(String(reps)); }
+      }
     }
   }
-  if (phase === "down" && leanBad) setCue("Torso muy inclinado", "warn");
   setChecks([
     ["Profundidad (cadera ≈ rodilla)", deep ? "ok" : "na", deep ? "OK" : "aún no"],
     ["Inclinación del torso", leanBad ? "warn" : "ok", Math.round(trunk) + "°"],
@@ -184,20 +226,24 @@ function evalSquat(lm, s){
   ]);
 }
 
-function evalTri(lm, s){
+function evalTri(lm, s, now){
   const elbow = ema("elbow", angle(lm[s.sh], lm[s.el], lm[s.wr]));
   const upper = ema("upper", fromVertical(lm[s.el], lm[s.sh]) );
   $("angle").textContent = Math.round(elbow) + "°"; $("angleLbl").textContent = "Ángulo codo";
 
-  if (phase === "up" && elbow < 90) { phase = "down"; triBaseline = upper; repWarnings = new Set(); }
+  if (phase === "up" && elbow < 90) { phase = "down"; phaseStart = now; triBaseline = upper; repWarnings = new Set(); }
   const drift = triBaseline == null ? 0 : Math.abs(upper - triBaseline);
   if (phase === "down") {
-    if (drift > 15) { repWarnings.add("shoulder"); setCue("Hombro quieto", "warn"); }
+    if (drift > 15 && !repWarnings.has("shoulder")) { repWarnings.add("shoulder"); setCue("Hombro quieto", "warn"); say("Hombro quieto"); }
     if (elbow > 150) {
-      phase = "up"; reps++; $("reps").textContent = reps;
-      if (repWarnings.has("shoulder")) say("Deja el hombro quieto, mueve solo el codo");
-      else { setCue("Buena repetición", "ok"); say(String(reps)); }
-      triBaseline = null;
+      phase = "up"; triBaseline = null;
+      if (now - phaseStart < MIN_DOWN_MS) { setCue("Muy rápido, no cuenta", "warn"); }
+      else {
+        reps++; $("reps").textContent = reps;
+        if (repWarnings.has("shoulder")) setCue("Cuenta, pero mueve solo el codo", "warn");
+        else setCue("Buena repetición", "ok");
+        say(String(reps));
+      }
     }
   }
   setChecks([
@@ -241,13 +287,16 @@ function loop(){
     if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
     const res = landmarker.detectForVideo(video, performance.now());
     const lm = res.landmarks && res.landmarks[0];
+    const now = performance.now();
     if (lm) {
       draw(lm);
       const s = bestSide(lm);
-      if (mode === "squat") evalSquat(lm, s); else if (mode === "tri") evalTri(lm, s); else evalFree(lm, s);
+      if (gate(lm, s, now)) {
+        if (mode === "squat") evalSquat(lm, s, now); else if (mode === "tri") evalTri(lm, s, now); else evalFree(lm, s);
+      }
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      setCue("No te veo completo", "warn");
+      if (mode === "free") setCue("No te veo", "warn"); else markLost(now);
     }
   }
   requestAnimationFrame(loop);
