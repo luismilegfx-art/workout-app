@@ -1,0 +1,10 @@
+{
+  "name": "workout-app",
+  "private": true,
+  "type": "module",
+  "description": "Aplicación de entrenamiento guiado por tiempo",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serve": "python3 -m http.server 8080"
+  }
+}
