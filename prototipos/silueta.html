@@ -55,7 +55,7 @@ h2 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; text-tran
 .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
 .views { display: flex; gap: 12px; justify-content: center; width: 100%; }
 .fig { flex: 1 1 0; max-width: 300px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.fig svg { width: 100%; height: auto; display: block; touch-action: manipulation; }
+.fig svg { width: 100%; height: auto; display: block; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .view-name { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .toggle { display: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .toggle button { border: 0; background: transparent; padding: 8px 18px; font-weight: 600; }
@@ -93,6 +93,8 @@ h2 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; text-tran
 .star[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .star:disabled { opacity: .35; cursor: not-allowed; }
 .pop-foot { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.pop-note { font-size: .74rem; color: var(--muted); }
+@media (pointer: coarse) { .pop-note { display: none; } }
 .link { border: 0; background: transparent; color: var(--muted); font-size: .85rem; padding: 4px 2px; }
 .done { border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg); font-weight: 700; padding: 6px 16px; }
 @media (max-width: 640px) {
@@ -239,7 +241,7 @@ function paint() {
   });
   document.querySelectorAll(".preset").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === state.preset)));
   renderPicked();
-  if (state.open) renderPop(state.open.z);
+  if (state.open) updatePop();
 }
 function samePreset() {
   const norm = sel => JSON.stringify(Object.keys(sel).filter(z => sel[z]?.length).sort().map(z => [z, [...sel[z]].sort()]));
@@ -268,8 +270,20 @@ function renderPop(z) {
   }).join("");
   pop.innerHTML = `<div class="pop-head"><h2>${ZONES[z].nombre}</h2><button class="pop-close" data-act="close" aria-label="Cerrar">Cerrar</button></div>
     <div class="subs">${subs}</div>
-    <div class="pop-foot"><button class="link" data-act="remove">Quitar zona</button><button class="done" data-act="close">Listo</button></div>`;
+    <div class="pop-foot"><button class="link" data-act="remove">Quitar zona</button><button class="done" data-act="close">Listo</button></div>
+    <span class="pop-note">Los cambios se guardan al momento. Doble clic o Supr quita la zona.</span>`;
   pop.setAttribute("aria-label", `Opciones de ${ZONES[z].nombre}`);
+}
+function updatePop() {
+  const z = state.open.z;
+  pop.querySelectorAll(".sub").forEach(row => {
+    const s = row.querySelector(".sub-toggle").dataset.s;
+    const inc = (state.sel[z] ?? []).includes(s);
+    row.querySelector(".sub-toggle").setAttribute("aria-pressed", String(inc));
+    const star = row.querySelector(".star");
+    star.setAttribute("aria-pressed", String(state.prio.has(K(z, s))));
+    star.disabled = !inc;
+  });
 }
 function openPop(z, x, y) {
   state.open = { z, x, y };
@@ -283,12 +297,17 @@ function openPop(z, x, y) {
 }
 function closePop() { state.open = null; pop.hidden = true; }
 const dropPrio = z => { state.prio = new Set([...state.prio].filter(k => !k.startsWith(z + "."))); };
+function removeZone(z) {
+  delete state.sel[z]; dropPrio(z); state.preset = samePreset();
+  if (state.open?.z === z) closePop();
+  paint();
+}
 
 pop.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b || !state.open) return;
   const z = state.open.z, s = b.dataset.s;
   if (b.dataset.act === "close") return closePop();
-  if (b.dataset.act === "remove") { delete state.sel[z]; dropPrio(z); state.preset = samePreset(); closePop(); return paint(); }
+  if (b.dataset.act === "remove") return removeZone(z);
   if (b.dataset.act === "sub") {
     const list = state.sel[z] ??= [];
     if (list.includes(s)) { state.sel[z] = list.filter(x => x !== s); state.prio.delete(K(z, s)); if (!state.sel[z].length) delete state.sel[z]; }
@@ -300,13 +319,25 @@ pop.addEventListener("click", e => {
 
 // ───────── Interacción con la figura ─────────
 const tip = document.getElementById("tip");
+let hoverZone = null;
+const wasSelected = {};
 function choose(el, x, y) {
   const { z } = el.dataset;
   if (!state.sel[z]?.length) state.sel[z] = [...ALL[z]];          // tocar una zona la incluye completa
   state.preset = samePreset(); paint(); openPop(z, x, y);
 }
 document.querySelectorAll("svg").forEach(svg => {
-  svg.addEventListener("click", e => { const el = e.target.closest(".m"); if (el) { e.stopPropagation(); choose(el, e.clientX, e.clientY); } });
+  svg.addEventListener("click", e => {
+    const el = e.target.closest(".m"); if (!el) return;
+    if (e.detail <= 1) wasSelected[el.dataset.z] = !!state.sel[el.dataset.z]?.length;
+    if (e.detail === 2) return;                      // el segundo clic lo resuelve dblclick
+    choose(el, e.clientX, e.clientY);
+  });
+  // Doble clic sobre una zona que ya estaba escogida: se quita
+  svg.addEventListener("dblclick", e => {
+    const el = e.target.closest(".m"); if (!el) return;
+    if (wasSelected[el.dataset.z]) removeZone(el.dataset.z);
+  });
   svg.addEventListener("keydown", e => {
     if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("m")) {
       e.preventDefault(); const r = e.target.getBoundingClientRect(); choose(e.target, r.right, r.top + r.height / 2);
@@ -316,14 +347,26 @@ document.querySelectorAll("svg").forEach(svg => {
     const el = e.target.closest(".m");
     document.querySelectorAll(".m.hover").forEach(p => p.classList.remove("hover"));
     if (!el || e.pointerType !== "mouse") { tip.hidden = true; return; }
+    hoverZone = el.dataset.z;
     document.querySelectorAll(`.m[data-z="${el.dataset.z}"]`).forEach(p => p.classList.add("hover"));
     tip.textContent = `${ZONES[el.dataset.z].nombre} · ${subName(el.dataset.z, el.dataset.s)}`;
     tip.style.left = `${e.clientX}px`; tip.style.top = `${e.clientY}px`; tip.hidden = false;
   });
-  svg.addEventListener("pointerleave", () => { tip.hidden = true; document.querySelectorAll(".m.hover").forEach(p => p.classList.remove("hover")); });
+  svg.addEventListener("pointerleave", () => { hoverZone = null; tip.hidden = true; document.querySelectorAll(".m.hover").forEach(p => p.classList.remove("hover")); });
 });
-document.addEventListener("click", e => { if (state.open && !pop.contains(e.target) && !e.target.closest(".chip")) closePop(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+document.addEventListener("pointerdown", e => {
+  if (!state.open) return;
+  if (pop.contains(e.target) || e.target.closest(".m, .chip")) return;
+  closePop();
+}, true);
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") return closePop();
+  if (e.key === "Delete" || e.key === "Backspace") {
+    if (e.target.closest("input, textarea")) return;
+    const z = state.open?.z ?? (hoverZone && state.sel[hoverZone]?.length ? hoverZone : null) ?? document.activeElement?.dataset?.z;
+    if (z && state.sel[z]?.length) { e.preventDefault(); removeZone(z); }
+  }
+});
 
 document.getElementById("picked").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return;
