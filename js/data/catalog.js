@@ -77,9 +77,16 @@ export const DEFAULT_SETTINGS = {
     exprésHasta: 8,        // minutos: hasta aquí la sesión es exprés (una sola zona, sin descanso)
     pasoCalentamiento: 40, pasoEstiramiento: 30,  // segundos por ejercicio
     margenTiempo: 5,       // ± % aceptado sobre el tiempo total
+    maxEquipos: 3,         // equipos distintos por sesión (el peso corporal no cuenta)
     registroMinDescanso: 15, // segundos: descansos más cortos acumulan el registro hasta uno más largo
+    // Fuerza: series por repeticiones; el tiempo de cada serie es una estimación para planificar
+    fuerza: {
+      series: [3, 5], repsPrincipal: [4, 6], repsAccesorio: [6, 10],
+      descansoPrincipal: 150, descansoAccesorio: 90, cambioEjercicio: 90,
+      serieEstimada: 40, isometrico: 40, principales: 2,
+      aproximacion: true, aproximaciones: [[50, 8], [75, 3]], descansoAproximacion: 60,
+    },
     formatos: {
-      fuerza:    { trabajo: [45, 60], descanso: [45, 60], descansoRonda: 90, rondas: [2, 3], porBloque: [2, 3] },
       masa:      { trabajo: [40, 50], descanso: [15, 30], descansoRonda: 60, rondas: [2, 3], porBloque: [3, 4] },
       condicion: { trabajo: [30, 40], descanso: [0, 15],  descansoRonda: 40, rondas: [1, 3], porBloque: [3, 4] },
       expres:    { trabajo: [30, 45], descanso: [0, 0],   descansoRonda: 0,  rondas: [1, 2], porBloque: [3, 6] },

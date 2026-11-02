@@ -124,3 +124,36 @@ test("los ejercicios unilaterales duran el doble (tiempo completo por lado)", ()
   const uni = work.find(s => EXERCISE_BY_ID[s.ejercicio].unilateral), bi = work.find(s => !EXERCISE_BY_ID[s.ejercicio].unilateral);
   if (uni && bi) assert.equal(uni.duracion, bi.duracion * 2);
 });
+
+test("límite de equipos: no más de 3 equipos distintos por sesión", () => {
+  const gear = r => new Set(r.bloques.flatMap(b => b.ejercicios).flatMap(id => EXERCISE_BY_ID[id].equipo.filter(q => q !== "corporal")));
+  for (const [k, p] of Object.entries(PRESETS)) for (const lugar of ["casa", "gym"]) for (const seed of [1, 2, 3]) {
+    const r = generateRoutine({ minutos: 45, zonas: p.sel, lugar, enfasis: "masa", seed }, settings);
+    assert.ok(gear(r).size <= 3, `${k}/${lugar}/${seed}: ${[...gear(r)]}`);
+  }
+});
+
+test("dentro de un bloque los ejercicios con el mismo equipo quedan seguidos", () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const r = generateRoutine({ minutos: 45, zonas: PRESETS.push.sel, lugar: "gym", enfasis: "masa", seed }, settings);
+    for (const b of r.bloques) {
+      const keys = b.ejercicios.map(id => EXERCISE_BY_ID[id].equipo.filter(q => q !== "corporal").sort().join("+"));
+      const seen = new Set(); let prev = null;
+      for (const k of keys) { if (k !== prev) { assert.ok(!seen.has(k), `${keys}`); seen.add(k); } prev = k; }
+    }
+  }
+});
+
+test("Fuerza: series abiertas con objetivo de reps, principales primero con aproximación", () => {
+  for (const seed of [1, 2, 3]) {
+    const r = generateRoutine({ minutos: 45, zonas: PRESETS.piernas.sel, lugar: "gym", enfasis: "fuerza", seed }, settings);
+    assert.equal(r.modo, "series");
+    assert.ok(r.bloques.every(b => b.ejercicios.length === 1));
+    assert.ok(r.bloques.length >= 2 && r.bloques.length <= 6, `${r.bloques.length} ejercicios`);
+    const sets = r.steps.filter(s => s.tipo === "trabajo" && s.abierto);
+    assert.ok(sets.every(s => Array.isArray(s.objetivo)));
+    assert.ok(r.bloques[0].principal);
+    const firstWork = r.steps.findIndex(s => s.tipo === "trabajo");
+    if (r.bloques[0].aproximacion) assert.equal(r.steps.slice(0, firstWork).some(s => s.tipo === "aproximacion"), true);
+  }
+});

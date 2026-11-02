@@ -23,7 +23,8 @@ export function prefill(log, step, lastFromHistory) {
   return {
     id: step.ejercicio, ronda: step.ronda ?? 0,
     medida: e.medida,
-    reps: e.medida === "reps" ? (base?.reps ?? null) : null,
+    // Fuerza: la ronda anterior o el objetivo de la serie (las reps de circuitos no sirven de referencia)
+    reps: e.medida !== "reps" ? null : step.objetivo ? (prev?.reps ?? step.objetivo[1]) : (base?.reps ?? null),
     peso: e.carga ? (base?.peso ?? null) : null,
     pausas: e.medida === "tiempo" ? 0 : null,
     confirmado: false,

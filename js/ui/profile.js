@@ -22,6 +22,11 @@ export function renderProfile(view, app) {
     <label class="label" for="${id}">${label}</label>
     <div class="row" style="flex-wrap:nowrap"><input class="input" type="number" id="${id}" data-param="${id}" value="${value}" ${attrs}><span class="muted">${suffix}</span></div></div>`;
 
+  const fnum = (key, label, value, suffix, attrs = "") => html`<div class="field">
+    <label class="label" for="f-${key}">${label}</label>
+    <div class="row" style="flex-wrap:nowrap"><input class="input" type="number" id="f-${key}" data-fparam="${key}" value="${value}" ${attrs}><span class="muted">${suffix}</span></div></div>`;
+  const F = p.fuerza;
+
   mount(view, html`
     <div class="spread"><h1>Perfil</h1></div>
 
@@ -79,11 +84,12 @@ export function renderProfile(view, app) {
         ${num("exprésHasta", "Exprés hasta", p.exprésHasta, "min", 'min="4" max="15"')}
         ${num("margenTiempo", "Margen sobre el tiempo", p.margenTiempo, "%", 'min="1" max="15"')}
         ${num("registroMinDescanso", "Descanso mínimo para anotar", p.registroMinDescanso, "s", 'min="0" max="60" step="5"')}
+        ${num("maxEquipos", "Equipos por sesión (máximo)", p.maxEquipos ?? 3, "", 'min="1" max="8"')}
       </div>
       <div class="table-wrap">
         <table class="fmt">
           <thead><tr><th>Formato</th><th>Trabajo (s)</th><th>Descanso (s)</th><th>Entre rondas (s)</th><th>Rondas</th><th>Ejercicios por bloque</th></tr></thead>
-          <tbody>${Object.entries(p.formatos).map(([k, f]) => html`<tr>
+          <tbody>${Object.entries(p.formatos).filter(([k]) => k !== "fuerza").map(([k, f]) => html`<tr>
             <th>${FORMAT_LABELS[k]}</th>
             <td><input class="input" type="number" step="5" data-fmt="${k}.trabajo.0" value="${f.trabajo[0]}" aria-label="${FORMAT_LABELS[k]} trabajo mínimo"> – <input class="input" type="number" step="5" data-fmt="${k}.trabajo.1" value="${f.trabajo[1]}" aria-label="${FORMAT_LABELS[k]} trabajo máximo"></td>
             <td><input class="input" type="number" step="5" data-fmt="${k}.descanso.0" value="${f.descanso[0]}" aria-label="${FORMAT_LABELS[k]} descanso mínimo"> – <input class="input" type="number" step="5" data-fmt="${k}.descanso.1" value="${f.descanso[1]}" aria-label="${FORMAT_LABELS[k]} descanso máximo"></td>
@@ -93,6 +99,17 @@ export function renderProfile(view, app) {
           </tr>`)}</tbody>
         </table>
       </div>
+      <span class="label">Fuerza (series por repeticiones)</span>
+      <div class="params">
+        ${fnum("repsPrincipal.0", "Reps principales: mínimo", F.repsPrincipal[0], "", 'min="1" max="20"')}
+        ${fnum("repsPrincipal.1", "Reps principales: máximo", F.repsPrincipal[1], "", 'min="1" max="20"')}
+        ${fnum("repsAccesorio.0", "Reps accesorios: mínimo", F.repsAccesorio[0], "", 'min="1" max="30"')}
+        ${fnum("repsAccesorio.1", "Reps accesorios: máximo", F.repsAccesorio[1], "", 'min="1" max="30"')}
+        ${fnum("descansoPrincipal", "Descanso principales", F.descansoPrincipal, "s", 'min="30" max="300" step="15"')}
+        ${fnum("descansoAccesorio", "Descanso accesorios", F.descansoAccesorio, "s", 'min="30" max="240" step="15"')}
+        ${fnum("serieEstimada", "Duración estimada por serie", F.serieEstimada, "s", 'min="15" max="120" step="5"')}
+      </div>
+      <label class="check"><input type="checkbox" id="opt-aprox" ${F.aproximacion ? "checked" : ""}> Series de aproximación antes de los ejercicios principales con carga</label>
     </section>
 
     <section class="card">
@@ -155,6 +172,14 @@ export function renderProfile(view, app) {
         app.settings = getSettings(); app.reloadHistory(); toast("Datos importados"); renderProfile(view, app);
       } catch (err) { toast(err.message || "No se pudo leer el archivo"); }
       return;
+    }
+    if (t.id === "opt-aprox") { app.updateSettings({ params: { ...p, fuerza: { ...F, aproximacion: t.checked } } }); return toast("Guardado"); }
+    if (t.dataset.fparam) {
+      const value = Number(t.value); if (!Number.isFinite(value) || value <= 0) return;
+      const fuerza = structuredClone(F); const [k, idx] = t.dataset.fparam.split(".");
+      if (idx === undefined) fuerza[k] = value; else fuerza[k][Number(idx)] = value;
+      if (Array.isArray(fuerza[k]) && fuerza[k][0] > fuerza[k][1]) { toast("El mínimo no puede ser mayor que el máximo"); return renderProfile(view, app); }
+      app.updateSettings({ params: { ...p, fuerza } }); return toast("Guardado");
     }
     if (t.dataset.param) {
       const value = Number(t.value); if (!Number.isFinite(value)) return;

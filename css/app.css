@@ -310,3 +310,11 @@ table.fmt input { width: 64px; }
 .sum-series { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .sum-serie { display: grid; grid-template-columns: 80px 120px 120px; gap: 10px; align-items: center; }
 @media (max-width: 420px) { .sum-serie { grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr); } }
+
+/* ───── series de Fuerza ───── */
+.p-target { display: flex; align-items: baseline; gap: 14px; }
+.p-target-v { font-family: var(--display); font-weight: 800; font-size: clamp(6rem, 22vw, 14rem); line-height: .82; font-variant-numeric: tabular-nums; }
+.p-target-u { font-family: var(--display); font-weight: 800; font-size: clamp(1.4rem, 4vw, 2.4rem); text-transform: uppercase; color: var(--muted); }
+.p-weight { color: var(--accent); font-weight: 600; }
+.p-done { min-width: 240px !important; }
+@media (max-width: 480px) { .p-done { min-width: 0 !important; flex: 1; } }

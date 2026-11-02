@@ -132,9 +132,11 @@ function exerciseWeight(e, ctx) {
   if (ctx.recent.has(e.id)) w *= 0.25;
   if (ctx.blockPatterns.has(e.patron)) w *= 0.35;          // ángulos y agarres distintos dentro del bloque
   const compuesto = !isIsolation(e);
-  if (ctx.enfasis === "fuerza") w *= (e.carga && compuesto) ? 1.8 : compuesto ? 1.2 : 0.6;
+  if (ctx.enfasis === "fuerza") w *= ((e.carga && compuesto) ? 1.8 : compuesto ? 1.2 : 0.6) * (e.unilateral ? 0.5 : 1);
   if (ctx.enfasis === "condicion" || ctx.enfasis === "expres") w *= (e.patron === "potencia" || !e.carga) ? 1.5 : 0.8;
   if (ctx.lugar === "gym" && e.equipo.some(q => q === "maquina" || q === "polea")) w *= 1.2;
+  const g = gearOf(e);
+  if (g.length && g.every(q => ctx.gear.has(q))) w *= 1.6;   // reutilizar el equipo que ya está a la mano
   return w;
 }
 
@@ -159,12 +161,24 @@ function pickForBlock(block, count, ctx, rng) {
       ctx.pool.filter(e => selected(e) && notInBlock(e)),
       ctx.pool.filter(e => sameZone(e) && notInBlock(e)),         // último recurso
     ];
-    const candidates = tiers.find(t => t.length);
+    // Límite de equipos por sesión: primero lo que cabe en el límite; solo si nada cabe, se excede
+    const candidates = tiers.map(t => t.filter(e => fitsGear(e, ctx))).find(t => t.length) ?? tiers.find(t => t.length);
     if (!candidates) break;
     const pick = weightedPick(candidates, e => exerciseWeight(e, ctx), rng) ?? candidates[0];
     chosen.push(pick.id); ctx.used.add(pick.id); ctx.blockPatterns.add(pick.patron);
+    gearOf(pick).forEach(q => ctx.gear.add(q));
   }
-  return chosen;
+  return groupByGear(chosen);
+}
+
+// Equipo que hay que preparar para un ejercicio (el peso corporal no cuenta)
+export const gearOf = e => e.equipo.filter(q => q !== "corporal");
+function fitsGear(e, ctx) { return new Set([...ctx.gear, ...gearOf(e)]).size <= ctx.maxGear; }
+// Ordena el bloque para que los ejercicios con el mismo equipo queden seguidos (menos cambios)
+function groupByGear(ids) {
+  const key = id => gearOf(EXERCISE_BY_ID[id]).sort().join("+");
+  const order = [...new Set(ids.map(key))];
+  return [...ids].sort((a, b) => order.indexOf(key(a)) - order.indexOf(key(b)));
 }
 
 // Calentamiento y estiramiento: primero los de los músculos trabajados, luego los de la zona del cuerpo,
@@ -218,13 +232,15 @@ export function generateRoutine(req, settings, history = []) {
     units = [pickFrom[Math.floor(rng() * pickFrom.length)]];
   }
 
+  const ctx = { settings, pool, used: new Set(), recent: recentIds(history), enfasis, lugar: req.lugar, blockPatterns: new Set(),
+    selected: new Set(units.flatMap(u => u.subs.map(s => `${u.zona}.${s}`))), gear: new Set(), maxGear: p.maxEquipos ?? 3 };
+  if (enfasis === "fuerza") return strengthPlan({ req, settings, history, rng, seed, units, equip, pool, ctx, warm, cool, workSec, totalSec, zona: bodyZone(units) });
+
   const fmt = p.formatos[enfasis];
   const zonePool = pool.filter(e => units.some(u => e.sub.startsWith(u.zona + "."))).length;
   const maxPerBlock = expres ? Math.min(fmt.porBloque[1], zonePool) : fmt.porBloque[1];
   const f = searchStructure(workSec, fmt, expres ? 1 : 10, maxPerBlock);
 
-  const ctx = { settings, pool, used: new Set(), recent: recentIds(history), enfasis, lugar: req.lugar, blockPatterns: new Set(),
-    selected: new Set(units.flatMap(u => u.subs.map(s => `${u.zona}.${s}`))) };
   const bloques = [];
   for (const b of allocateBlocks(units, f.bloques, history)) {
     const ejercicios = pickForBlock(b, f.porBloque, ctx, rng);
@@ -268,7 +284,8 @@ export function generateRoutine(req, settings, history = []) {
     if (dur > totalSec) for (const b of plan.bloques) b.ejercicios.forEach((id, j) => {
       const e = EXERCISE_BY_ID[id]; if (!e.unilateral) return;
       const inPlan = new Set(plan.bloques.flatMap(x => x.ejercicios));
-      const alt = pool.find(x => x.sub === e.sub && !x.unilateral && !inPlan.has(x.id) && x.nivel <= settings.nivel + 1);
+      const gear = new Set(plan.bloques.flatMap(x => x.ejercicios).flatMap(i => gearOf(EXERCISE_BY_ID[i])));
+      const alt = pool.find(x => x.sub === e.sub && !x.unilateral && !inPlan.has(x.id) && x.nivel <= settings.nivel + 1 && gearOf(x).every(q => gear.has(q)));
       if (alt) moves.push({ cost: 10, apply: () => { b.ejercicios[j] = alt.id; }, undo: () => { b.ejercicios[j] = id; } });
     });
     let best = null;
@@ -284,6 +301,113 @@ export function generateRoutine(req, settings, history = []) {
   plan.steps = steps;
   plan.totalSec = dur;
   return plan;
+}
+
+
+// ───────── Fuerza: series por repeticiones ─────────
+// Cada bloque es un ejercicio con sus series. Los principales (compuestos) van primero, con descanso largo
+// y series de aproximación si llevan carga; los accesorios, con descanso más corto.
+function strengthPlan({ req, settings, history, rng, seed, units, equip, pool, ctx, warm, cool, workSec, totalSec, zona }) {
+  const p = settings.params, F = p.fuerza;
+  const aproxSec = Math.round(F.serieEstimada * 0.6);
+  const estimate = (n, sets) => {
+    let t = (n - 1) * F.cambioEjercicio;
+    for (let k = 0; k < n; k++) {
+      const main = k < F.principales;
+      if (main && F.aproximacion) t += F.aproximaciones.length * (aproxSec + F.descansoAproximacion);
+      t += sets * F.serieEstimada + (sets - 1) * (main ? F.descansoPrincipal : F.descansoAccesorio);
+    }
+    return t;
+  };
+  let best = null;
+  for (let n = 1; n <= 8; n++) for (let sets = F.series[0]; sets <= F.series[1]; sets++) {
+    const err = Math.abs(estimate(n, sets) - workSec) / workSec + Math.abs(sets - (F.series[0] + F.series[1]) / 2) * 0.02
+      + Math.max(0, 3 - n) * 0.06;   // con tiempo suficiente: dos principales y al menos un accesorio
+    if (!best || err < best.err) best = { n, sets, err };
+  }
+
+  const chosen = [];
+  for (const b of allocateBlocks(units, best.n, history)) {
+    const [id] = pickForBlock(b, 1, ctx, rng);
+    if (id) chosen.push({ zona: b.zona, subs: b.subs, id });
+  }
+  const rank = id => { const e = EXERCISE_BY_ID[id]; return e.medida === "tiempo" ? 3 : !isIsolation(e) && e.carga ? 0 : !isIsolation(e) ? 1 : 2; };
+  chosen.sort((a, b) => rank(a.id) - rank(b.id));
+  let mains = 0;
+  const bloques = chosen.map(c => {
+    const e = EXERCISE_BY_ID[c.id];
+    const main = mains < F.principales && rank(c.id) <= 1 && ++mains > 0;
+    return { zona: c.zona, subs: c.subs, ejercicios: [c.id], trabaja: [e.sub], rondas: best.sets,
+      principal: main, reps: main ? [...F.repsPrincipal] : [...F.repsAccesorio],
+      descansoSerie: main ? F.descansoPrincipal : F.descansoAccesorio,
+      aproximacion: main && F.aproximacion && e.carga };
+  });
+
+  const musculos = [...new Set(bloques.map(b => EXERCISE_BY_ID[b.ejercicios[0]].musculo))];
+  const plan = {
+    id: `r-${Date.now().toString(36)}-${seed.toString(36)}`, seed, creada: new Date().toISOString(),
+    minutos: req.minutos, lugar: req.lugar, preset: req.lugar === "casa" ? (req.preset ?? settings.presetActivo) : null,
+    equipo: [...equip], enfasis: "fuerza", expres: false, modo: "series",
+    zonas: Object.fromEntries(units.map(u => [u.zona, u.subs])),
+    prioridad: units.flatMap(u => u.prio.map(s => `${u.zona}.${s}`)),
+    formato: { serie: F.serieEstimada, descansoPrincipal: F.descansoPrincipal, descansoAccesorio: F.descansoAccesorio },
+    calentamiento: pickAuxiliary("calentamiento", zona, warm.n, ctx, rng, musculos),
+    estiramiento: pickAuxiliary("estiramiento", zona, cool.n, ctx, rng, musculos),
+    bloques,
+  };
+
+  // Ajuste al tiempo: series por ejercicio y segundos de descanso
+  const margin = totalSec * p.margenTiempo / 100;
+  const measure = () => sumSteps(buildSteps(plan, settings));
+  let dur = measure();
+  for (let guard = 0; guard < 40 && Math.abs(dur - totalSec) > margin; guard++) {
+    const moves = [];
+    for (const b of plan.bloques) {
+      const [lo, hi] = b.principal ? [90, 240] : [45, 150];
+      for (const d of [-15, 15]) if (b.descansoSerie + d >= lo && b.descansoSerie + d <= hi)
+        moves.push({ cost: 5, apply: () => { b.descansoSerie += d; }, undo: () => { b.descansoSerie -= d; } });
+      for (const d of [-1, 1]) if (b.rondas + d >= 2 && b.rondas + d <= F.series[1] + 1)
+        moves.push({ cost: 15, apply: () => { b.rondas += d; }, undo: () => { b.rondas -= d; } });
+    }
+    // Sesiones muy cortas: la aproximación se reduce a una serie
+    if (dur > totalSec) for (const b of plan.bloques) if (b.aproximacion && !b.aproxCorta)
+      moves.push({ cost: 25, apply: () => { b.aproxCorta = true; }, undo: () => { delete b.aproxCorta; } });
+    let bestMove = null;
+    for (const m of moves) {
+      m.apply(); const err = Math.abs(measure() - totalSec) + m.cost; m.undo();
+      if (!bestMove || err < bestMove.err) bestMove = { m, err };
+    }
+    if (!bestMove || bestMove.err - bestMove.m.cost >= Math.abs(dur - totalSec)) break;
+    bestMove.m.apply(); dur = measure();
+  }
+  plan.steps = buildSteps(plan, settings);
+  plan.totalSec = dur;
+  return plan;
+}
+
+function buildSeriesSteps(plan, settings, push) {
+  const F = settings.params.fuerza;
+  const aproxSec = Math.round(F.serieEstimada * 0.6);
+  plan.bloques.forEach((bl, b) => {
+    const id = bl.ejercicios[0], e = EXERCISE_BY_ID[id];
+    const fase = `Ejercicio ${b + 1} de ${plan.bloques.length}`;
+    const aprox = bl.aproxCorta ? F.aproximaciones.slice(-1) : F.aproximaciones;
+    if (bl.aproximacion) aprox.forEach(([pct, reps], k) => {
+      push({ tipo: "aproximacion", ejercicio: id, abierto: true, duracion: aproxSec, pct, objetivo: [reps, reps],
+        fase, paso: k + 1, pasos: aprox.length, bloque: b });
+      push({ tipo: "descanso", duracion: F.descansoAproximacion, siguiente: id, bloque: b });
+    });
+    for (let r = 0; r < bl.rondas; r++) {
+      const timed = e.medida === "tiempo";
+      push({ tipo: "trabajo", ejercicio: id, abierto: !timed, objetivo: timed ? null : bl.reps,
+        duracion: timed ? F.isometrico * (e.unilateral ? 2 : 1) : F.serieEstimada * (e.unilateral ? 2 : 1),
+        cambioLado: e.unilateral && timed, bloque: b, ronda: r, rondas: bl.rondas, slot: 0, fase, serie: true });
+      const last = r === bl.rondas - 1, end = last && b === plan.bloques.length - 1;
+      if (end) break;
+      const next = last ? plan.bloques[b + 1].ejercicios[0] : id;
+      push({ tipo: last ? "cambio-bloque" : "descanso", duracion: last ? F.cambioEjercicio : bl.descansoSerie, siguiente: next, bloque: b, ronda: r });
+    }
+  });
 }
 
 // ───────── línea de tiempo ─────────
@@ -312,7 +436,8 @@ export function buildSteps(plan, settings) {
   plan.calentamiento.forEach((id, k) => push({ tipo: "calentamiento", ejercicio: id, duracion: p.pasoCalentamiento,
     fase: "Calentamiento", paso: k + 1, pasos: plan.calentamiento.length, cambioLado: EXERCISE_BY_ID[id]?.unilateral }));
 
-  plan.bloques.forEach((bl, b) => {
+  if (plan.modo === "series") buildSeriesSteps(plan, settings, push);
+  else plan.bloques.forEach((bl, b) => {
     for (let r = 0; r < bl.rondas; r++) {
       bl.ejercicios.forEach((id, j) => {
         const e = EXERCISE_BY_ID[id];

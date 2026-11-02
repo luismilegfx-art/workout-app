@@ -9,19 +9,15 @@ import { swapExercise, buildSteps, sumSteps } from "../engine/generator.js";
 import { createLog, markDone, canLogIn, settle, update, PAUSE_OPTIONS, DEFAULT_REPS } from "../engine/session-log.js";
 import { techCard } from "./technique.js";
 import { lastLogFor } from "../store.js";
+import { keepAwake, releaseAwake } from "../engine/keep-awake.js";
 
 const STATE = { preparacion: "prep", calentamiento: "aux", estiramiento: "aux", trabajo: "work" };
-const WORKISH = ["trabajo", "calentamiento", "estiramiento"];
+const WORKISH = ["trabajo", "calentamiento", "estiramiento", "aproximacion"];
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-let wakeLock = null;
-
-async function keepAwake() {
-  try { wakeLock = await navigator.wakeLock?.request("screen"); wakeLock?.addEventListener?.("release", () => { wakeLock = null; }); }
-  catch { wakeLock = null; }
-}
-function onVisibility() { if (document.visibilityState === "visible" && wakeLock === null) keepAwake(); }
 
 const nameOf = id => EXERCISE_BY_ID[id]?.nombre ?? "";
+const round5 = v => Math.max(5, Math.round(v / 5) * 5);
+const repsText = o => o[0] === o[1] ? `${o[0]}` : `${o[0]}–${o[1]}`;
 
 function announce(step, prev) {
   const e = EXERCISE_BY_ID[step.ejercicio];
@@ -29,7 +25,10 @@ function announce(step, prev) {
     case "preparacion": return `Prepárate. Primero: ${nameOf(step.siguiente)}`;
     case "calentamiento": return step.paso === 1 ? `Calentamiento. ${e.nombre}` : e.nombre;
     case "estiramiento": return step.paso === 1 ? `Estiramiento. ${e.nombre}` : e.nombre;
+    case "aproximacion": return `Aproximación ${step.paso} de ${step.pasos}. ${e.nombre}. ${step.objetivo[0]} repeticiones ligeras`;
     case "trabajo": {
+      if (step.serie && step.objetivo) return `Serie ${step.ronda + 1} de ${step.rondas}. ${e.nombre}. ${step.objetivo[0]} a ${step.objetivo[1]} repeticiones`;
+      if (step.serie) return `Serie ${step.ronda + 1} de ${step.rondas}. ${e.nombre}`;
       const newRound = step.slot === 0 && step.ronda > 0 && prev?.tipo === "descanso-ronda";
       return newRound ? `Ronda ${step.ronda + 1}. ${e.nombre}` : e.nombre;
     }
@@ -69,7 +68,7 @@ export function openPlayer(app) {
       lastIndex = i;
       draw();
       if (!started) return;
-      if (forward && prev && WORKISH.includes(prev.tipo) && !WORKISH.includes(s.tipo)) beep("stop");
+      if (forward && prev && WORKISH.includes(prev.tipo) && !prev.abierto && !WORKISH.includes(s.tipo)) beep("stop");
       if (WORKISH.includes(s.tipo)) beep("go");
       say(announce(s, plan.steps[i - 1]));
     },
@@ -92,6 +91,8 @@ export function openPlayer(app) {
     if (bar) bar.style.width = `${Math.min(100, runner.elapsedTotalSec / runner.totalSec * 100)}%`;
     const left = root.querySelector("[data-left]");
     if (left) left.textContent = `${fmtClock(totalLeft())} restantes`;
+    const el = root.querySelector("[data-elapsed]");
+    if (el) el.textContent = fmtClock(runner.openElapsedMs / 1000);
     const side = root.querySelector("[data-side]");
     if (side) side.textContent = runner.remainingMs / 1000 > s.duracion / 2 ? "Primer lado" : "Segundo lado";
     root.dataset.paused = String(runner.paused);
@@ -113,7 +114,7 @@ export function openPlayer(app) {
       ${shown.map(i => {
         const x = log.entries[i], e = EXERCISE_BY_ID[x.id], st = plan.steps[i];
         return html`<div class="logp-row">
-          <div class="logp-name"><b>${e.nombre}</b><span class="muted">${st.rondas > 1 ? `Ronda ${st.ronda + 1}` : ""}</span></div>
+          <div class="logp-name"><b>${e.nombre}</b><span class="muted">${st.rondas > 1 ? `${st.serie ? "Serie" : "Ronda"} ${st.ronda + 1}` : ""}</span></div>
           ${x.medida === "tiempo"
             ? html`<div class="pauses" role="group" aria-label="Pausas en ${e.nombre}">${PAUSE_OPTIONS.map(o =>
                 html`<button class="chip" data-log="pausas" data-i="${i}" data-v="${o.v}" aria-pressed="${x.pausas === o.v}">${o.label}</button>`)}</div>`
@@ -129,13 +130,32 @@ export function openPlayer(app) {
     if (input && document.activeElement !== input) input.value = v ?? "";
   }
 
+  // En Fuerza, lo siguiente suele ser otra serie del mismo ejercicio: se dice así en vez de repetir el nombre
+  function seriesNext(s) {
+    const rest = plan.steps[runner.index + 1];
+    const after = plan.steps.slice(runner.index + 1).find(x => WORKISH.includes(x.tipo));
+    if (!after) return "fin de la sesión";
+    const restTxt = rest && !WORKISH.includes(rest.tipo) ? `descanso ${fmtClock(rest.duracion)} · ` : "";
+    if (after.ejercicio !== s.ejercicio) return `${restTxt}${nameOf(after.ejercicio)}`;
+    if (after.tipo === "aproximacion") return `${restTxt}aproximación ${after.paso} de ${after.pasos}`;
+    return `${restTxt}serie ${after.ronda + 1} de ${after.rondas}`;
+  }
+
   function draw() {
     const s = runner.step ?? plan.steps[0];
     const isWork = WORKISH.includes(s.tipo);
     const shownId = isWork ? s.ejercicio : s.siguiente;
     const ex = EXERCISE_BY_ID[shownId];
     root.dataset.state = STATE[s.tipo] ?? "rest";
-    const phase = s.tipo === "trabajo" ? `${s.fase} · Ronda ${s.ronda + 1}/${s.rondas}`
+    const open = !!s.abierto;
+    const nextWork = plan.steps.slice(runner.index + 1).find(x => WORKISH.includes(x.tipo));
+    const last = ex?.carga ? lastLogFor(ex.id) : null;
+    const weightNote = !ex?.carga || !isWork ? ""
+      : s.tipo === "aproximacion" ? (last?.peso ? `≈ ${round5(last.peso * s.pct / 100)} lb · ${s.pct}% del peso de trabajo` : `Ligero: ${s.pct}% de tu peso de trabajo`)
+      : s.serie && last?.peso ? `Peso de referencia: ${last.peso} lb` : "";
+    const phase = s.tipo === "aproximacion" ? `${s.fase} · Aproximación ${s.paso}/${s.pasos}`
+      : s.serie ? `${s.fase} · Serie ${s.ronda + 1}/${s.rondas}`
+      : s.tipo === "trabajo" ? `${s.fase} · Ronda ${s.ronda + 1}/${s.rondas}`
       : isWork ? `${s.fase} · ${s.paso}/${s.pasos}`
       : s.tipo === "preparacion" ? "Prepárate"
       : s.tipo === "transicion" ? "Cambio de equipo"
@@ -143,7 +163,8 @@ export function openPlayer(app) {
     const nextAfter = isWork ? s.siguiente : plan.steps.slice(runner.index + 1).find(x => x.ejercicio && x.ejercicio !== s.siguiente)?.ejercicio;
     const canSwap = ex && ex.tipo === "principal";
     const equipNote = s.tipo === "transicion" && ex ? `Prepara: ${ex.equipo.filter(q => q !== "corporal").map(q => EQUIPMENT[q]).join(", ")}` : "";
-    const workLabel = s.tipo === "trabajo" ? (ex?.medida === "tiempo" ? "Sostén" : "Trabajo") : s.fase;
+    const workLabel = s.tipo === "aproximacion" ? "Aproximación" : s.serie ? `Serie ${s.ronda + 1} de ${s.rondas}`
+      : s.tipo === "trabajo" ? (ex?.medida === "tiempo" ? "Sostén" : "Trabajo") : s.fase;
 
     root.innerHTML = String(html`
       <div>
@@ -159,21 +180,30 @@ export function openPlayer(app) {
       <div class="p-body">
         <div class="p-main">
           <span class="p-phase">${isWork ? workLabel : (s.tipo === "preparacion" ? "Empieza en" : "Descanso")}</span>
-          <div class="p-clock" aria-live="off">${fmtClock(runner.remainingMs / 1000 || s.duracion)}</div>
+          ${open ? html`<div class="p-target"><span class="p-target-v">${repsText(s.objetivo)}</span><span class="p-target-u">${s.tipo === "aproximacion" ? "reps ligeras" : "reps"}</span></div>
+              <div class="p-next">Tiempo en la serie: <b class="mono" data-elapsed>0</b></div>`
+            : html`<div class="p-clock" aria-live="off">${fmtClock(runner.remainingMs / 1000 || s.duracion)}</div>`}
           <div class="p-name">${isWork ? ex?.nombre : html`<span class="muted">Próximo:</span> ${ex?.nombre ?? "Fin"}`}</div>
           ${isWork && s.cambioLado ? html`<div class="p-next"><b data-side></b> · cambia a la mitad</div>` : ""}
+          ${!isWork && nextWork && (nextWork.serie || nextWork.tipo === "aproximacion") ? html`<div class="p-next"><b>${nextWork.tipo === "aproximacion"
+              ? `Aproximación ${nextWork.paso} de ${nextWork.pasos}` : `Serie ${nextWork.ronda + 1} de ${nextWork.rondas}`}</b>${nextWork.objetivo ? ` · ${repsText(nextWork.objetivo)} reps` : ""}</div>` : ""}
+          ${weightNote ? html`<div class="p-next p-weight">${weightNote}</div>` : ""}
           ${equipNote ? html`<div class="p-next">${equipNote}</div>` : ""}
-          ${isWork && nextAfter ? html`<div class="p-next">Después: <b>${nameOf(nextAfter)}</b></div>` : ""}
+          ${isWork && (s.serie || s.tipo === "aproximacion") ? html`<div class="p-next">Después: <b>${seriesNext(s)}</b></div>`
+            : isWork && nextAfter ? html`<div class="p-next">Después: <b>${nameOf(nextAfter)}</b></div>` : ""}
         </div>
         <div class="p-side">
           ${logPanel()}
-          ${ex ? techCard(ex, { last: ex.carga ? lastLogFor(ex.id) : null }) : ""}
+          ${ex ? techCard(ex, { last: open ? null : last }) : ""}
           ${canSwap ? html`<div class="row"><button class="btn small" data-action="swap" data-id="${ex.id}">Cambiar este ejercicio</button>
             ${!isWork ? html`<button class="btn small" data-action="more">+15 s de descanso</button>` : ""}</div>` : ""}
         </div>
       </div>
       <div class="p-controls">
-        ${started ? html`
+        ${started && open ? html`
+          <button class="btn" data-action="prev" aria-label="Anterior">Anterior</button>
+          <button class="btn primary p-play p-done" data-action="next">${s.tipo === "aproximacion" ? "Hecho" : "Serie completada"}</button>`
+        : started ? html`
           <button class="btn" data-action="prev" aria-label="Anterior">Anterior</button>
           <button class="btn primary p-play" data-action="toggle">${runner.paused ? "Seguir" : "Pausa"}</button>
           <button class="btn" data-action="next" aria-label="Siguiente">Siguiente</button>`
@@ -188,9 +218,7 @@ export function openPlayer(app) {
   async function close(stats, finished) {
     runner.stop(); stopSpeech();
     if (finished) { beep("end"); say("Sesión completada. Buen trabajo."); }
-    try { await wakeLock?.release(); } catch {}
-    wakeLock = null;
-    document.removeEventListener("visibilitychange", onVisibility);
+    releaseAwake();
     document.removeEventListener("keydown", onKey);
     document.body.style.overflow = "";
     root.remove();
@@ -202,7 +230,7 @@ export function openPlayer(app) {
 
   function onKey(e) {
     if (!started || e.target.closest("input, textarea")) return;
-    if (e.code === "Space") { e.preventDefault(); runner.toggle(); draw(); }
+    if (e.code === "Space") { e.preventDefault(); if (runner.isOpen) runner.next(); else { runner.toggle(); draw(); } }
     if (e.code === "ArrowRight") runner.next();
     if (e.code === "ArrowLeft") runner.prev();
   }
@@ -233,7 +261,6 @@ export function openPlayer(app) {
     switch (t.dataset.action) {
       case "begin":
         unlockAudio(); keepAwake(); started = true;
-        document.addEventListener("visibilitychange", onVisibility);
         runner.start(0);
         break;
       case "toggle": runner.toggle(); stopSpeech(); draw(); break;

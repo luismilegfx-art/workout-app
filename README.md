@@ -12,7 +12,10 @@ Progreso (inicio) · Rutinas · **Entrenar** · Biblioteca · Perfil
 
 - Flujo de Entrenar paso a paso: lugar (con preset de equipo en casa) → zona en una figura anatómica con subzonas y prioridades → tiempo → énfasis.
 - Generador por zonas y subzonas: las prioritarias reciben más ejercicios, varía ángulos y agarres, nunca sale de lo escogido.
-- Énfasis por sesión: Fuerza, Músculo o Resistencia.
+- Énfasis por sesión: Fuerza (series por repeticiones con descanso largo y series de aproximación), Músculo o Resistencia (circuitos por tiempo).
+- Máximo de equipos por sesión (inicial 3) y ejercicios agrupados por equipo dentro de cada bloque.
+- Registro durante el descanso, precargado y guardado solo; isométricos por pausas.
+- Pantalla siempre encendida durante la sesión (Wake Lock y respaldo para iPhone).
 - Progreso: semana actual frente a la meta, constancia, calendario y sesiones recientes.
 - Rutinas guardadas con estrellas, carpetas y comentarios.
 - Sesiones exprés: un solo grupo muscular, ejercicios encadenados.
