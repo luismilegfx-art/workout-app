@@ -133,7 +133,7 @@ export function renderSummary(view, app) {
     if (t.dataset.action === "star") { const n = Number(t.dataset.value); form.estrellas = form.estrellas === n ? 0 : n; renderSummary(view, app); return; }
     if (t.dataset.action === "discard") {
       const ok = await confirmInPage({ title: "¿Descartar la sesión?", body: "No se guardará en el historial.", ok: "Descartar", danger: true });
-      if (ok) { app.result = null; app.go("entrenar"); }
+      if (ok) { app.result = null; app.request = null; app.plan = null; app.go("entrenar"); }
       return;
     }
     if (t.dataset.action === "save") {
@@ -155,7 +155,7 @@ export function renderSummary(view, app) {
       else if (form.guardar) saveRoutine(plan, { nombre: `${planLabel(plan)} · ${placeLabel(plan, app.settings)} · ${plan.minutos} min`, estrellas: form.estrellas, comentario: form.notas, ultimaVez: new Date().toISOString() });
       if (molestias.length) app.updateSettings({ evitar: [...new Set([...app.settings.evitar, ...molestias])] });
       app.reloadHistory();
-      app.result = null;
+      app.result = null; app.request = null; app.plan = null;    // el próximo entrenamiento empieza en el primer paso
       toast(molestias.length ? "Guardada. Los ejercicios con molestia se evitarán." : "Sesión guardada");
       app.go("progreso");
     }
