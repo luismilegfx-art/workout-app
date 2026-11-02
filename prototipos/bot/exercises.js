@@ -13,15 +13,15 @@ const SEGMENTOS = {
   gluteos: ["pelvis"], pantorrillas: ["shinL", "shinR"], core: ["abdomen"], cardio: [],
 };
 
-function fromFicha(f) {
-  const m = MOTIONS[f.movimiento.modelo];
+function fromFicha(f, modelo = f.movimiento.modelo, variante = null) {
+  const m = MOTIONS[modelo];
   const musculos = [f.musculo, ...f.secundarios];
   const zona = f.sub ? ZONES[f.sub.split(".")[0]].nombre : MUSCLES[f.musculo];
   const nombres = musculos.map(x => MUSCLES[x]).filter(n => n !== zona)       // "Pecho · Tríceps y hombros", sin repetir la zona
     .map((n, i) => i ? n.toLowerCase() : n);
   const y = /^h?i/i.test(nombres.at(-1)) ? " e " : " y ";
   return {
-    id: f.id, nombre: f.nombre, ficha: f,
+    id: variante ? modelo : f.id, nombre: variante ? `${f.nombre} · ${variante}` : f.nombre, ficha: f, modelo,
     zona: `${zona} · ${nombres.length > 1 ? nombres.slice(0, -1).join(", ") + y + nombres.at(-1) : nombres[0]}`,
     isometrico: f.medida === "tiempo",
     vista: f.movimiento.vista, props: f.movimiento.accesorios, flecha: f.movimiento.trayectoria,
@@ -34,11 +34,13 @@ function fromFicha(f) {
   };
 }
 
-// Todos los ejercicios con movimiento disponible, en el orden de la prueba
+// Todos los ejercicios con movimiento disponible, en el orden de la prueba.
+// Las variantes muestran otro modelo de movimiento para la misma ficha (por ejemplo, el extraído de video) para compararlos.
 const ORDEN = ["sentadilla-barra", "flexiones", "curl-mancuernas", "plancha", "sentadilla-pared"];
+const VARIANTES = { "sentadilla-barra": [{ modelo: "sentadilla-barra-video", nombre: "desde video" }] };
 export const BOT_EXERCISES = EXERCISES.filter(e => e.movimiento && MOTIONS[e.movimiento.modelo])
   .sort((a, b) => (ORDEN.indexOf(a.id) + 1 || 99) - (ORDEN.indexOf(b.id) + 1 || 99))
-  .map(fromFicha);
+  .flatMap(f => [fromFicha(f), ...(VARIANTES[f.id] ?? []).filter(x => MOTIONS[x.modelo]).map(x => fromFicha(f, x.modelo, x.nombre))]);
 
 // Posición t y fase actual a partir del tiempo del ciclo
 export function sample(ex, time) {

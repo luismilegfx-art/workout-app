@@ -3,8 +3,70 @@
 // de cada alineación por su id. Los textos, el tempo, el ángulo, los puntos fijos y la vista viven en la ficha del ejercicio
 // (js/data/exercises.js). Los modelos hechos a mano se irán sustituyendo por movimiento extraído de video.
 import { BODY, v, rad, lerp, UP, FWD, trunk, footOnFloor, plantedLeg, joints, reachArm, armFK } from "./rig.js";
+import sentadillaVideo from "./motions/sentadilla-barra.video.js";
 
 const toeDir = (side, out = 15) => v(Math.sin(rad(out)) * side, 0, Math.cos(rad(out)));
+
+// Barra sobre la parte alta de la espalda, con las manos agarrándola (sentadilla trasera)
+function barOnBack(tr, elbowPole) {
+  const { l, u, f } = tr.basis;
+  const bar = tr.chest.clone().add(f.clone().multiplyScalar(-0.10)).add(u.clone().multiplyScalar(0.02));
+  const grip = s => bar.clone().add(l.clone().multiplyScalar(0.40 * s)).add(u.clone().multiplyScalar(-0.03));
+  const elbowDir = s => elbowPole?.(s) ?? u.clone().multiplyScalar(-1).add(f.clone().multiplyScalar(-0.6)).add(l.clone().multiplyScalar(0.3 * s));
+  return {
+    armL: reachArm(tr.shoulderL, grip(1), elbowDir(1), u), armR: reachArm(tr.shoulderR, grip(-1), elbowDir(-1), u),
+    barbell: { center: bar, axis: l },
+  };
+}
+const squatLines = (j, p) => ({ "barra-medio-pie": [p.props.barbell.center, p.props.barbell.center.clone().setY(0.005)], "espalda-recta": [j.pelvis, j.neck] });
+
+// ───────── Movimiento extraído de video ─────────
+// Del video se toma lo que la cámara mide bien sin importar desde dónde grabe: los ángulos de rodilla y cadera
+// por profundidad t (0 = inicio, 1 = final), la apertura de los pies y cuánto apuntan hacia afuera.
+// La postura completa se resuelve con las proporciones del bot y una regla física: la barra queda sobre el medio del pie.
+export function squatFromVideo(data) {
+  const M = data.muestras;
+  const at = t => {
+    let i = 0; while (i < M.length - 2 && M[i + 1].t < t) i++;
+    const a = M[i], b = M[i + 1], k = Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t || 1)));
+    return { K: lerp(a.rodilla, b.rodilla, k), H: lerp(a.cadera, b.cadera, k) };
+  };
+  const legLen = BODY.thigh + BODY.shin;
+  const footX = data.apertura * legLen / 2;
+  const abd = Math.asin(Math.min(0.5, (footX - BODY.hipHalf) / legLen));       // piernas algo abiertas
+  const shin = BODY.shin * Math.cos(abd), thigh = BODY.thigh * Math.cos(abd);
+  const midFootZ = BODY.footLen / 2 - BODY.heelBack;
+  const dir = a => v(0, Math.cos(a), Math.sin(a));                              // ángulo desde la vertical, positivo hacia el frente
+
+  function build(t, thetaS) {
+    const { K, H } = at(t);
+    const knee = v(0, BODY.ankleH, 0).addScaledVector(dir(thetaS), shin);
+    const aThigh = thetaS + rad(K) + Math.PI;                                  // de la rodilla a la cadera
+    const pelvis = knee.clone().addScaledVector(dir(aThigh), thigh);
+    const aSpine = thetaS + rad(K) - rad(H);                                   // inclinación del tronco
+    const tr = trunk(pelvis, dir(aSpine), FWD, BODY, Math.max(0, aSpine * 180 / Math.PI) * 0.6);
+    return { tr, ...barOnBack(tr) };
+  }
+  // Ángulo de la tibia que deja la barra sobre el medio del pie (búsqueda por bisección)
+  function solve(t) {
+    let lo = rad(-5), hi = rad(50);
+    for (let i = 0; i < 28; i++) {
+      const mid = (lo + hi) / 2;
+      if (build(t, mid).barbell.center.z < midFootZ) lo = mid; else hi = mid;
+    }
+    return build(t, (lo + hi) / 2);
+  }
+  return {
+    data,
+    pose(t) {
+      const { tr, armL, armR, barbell } = solve(t);
+      const fL = footOnFloor(footX, 0, toeDir(1, data.puntas)), fR = footOnFloor(-footX, 0, toeDir(-1, data.puntas));
+      const legL = plantedLeg(tr.hipL, fL, toeDir(1, data.puntas)), legR = plantedLeg(tr.hipR, fR, toeDir(-1, data.puntas));
+      return { j: joints(tr, legL, legR, armL, armR), props: { barbell } };
+    },
+    lineas: squatLines,
+  };
+}
 
 // ───────── Sentadilla con barra ─────────
 const sentadilla = {
@@ -15,17 +77,10 @@ const sentadilla = {
     const tr = trunk(pelvis, up, FWD, BODY, lean * 0.6);
     const fL = footOnFloor(0.17, 0.02, toeDir(1)), fR = footOnFloor(-0.17, 0.02, toeDir(-1));
     const legL = plantedLeg(tr.hipL, fL, toeDir(1)), legR = plantedLeg(tr.hipR, fR, toeDir(-1));
-    const { l, u, f } = tr.basis;
-    const bar = tr.chest.clone().add(f.clone().multiplyScalar(-0.10)).add(u.clone().multiplyScalar(0.02));
-    const grip = s => bar.clone().add(l.clone().multiplyScalar(0.40 * s)).add(u.clone().multiplyScalar(-0.03));
-    const elbowDir = s => u.clone().multiplyScalar(-1).add(f.clone().multiplyScalar(-0.6)).add(l.clone().multiplyScalar(0.3 * s));
-    const armL = reachArm(tr.shoulderL, grip(1), elbowDir(1), u), armR = reachArm(tr.shoulderR, grip(-1), elbowDir(-1), u);
-    return { j: joints(tr, legL, legR, armL, armR), props: { barbell: { center: bar, axis: l } } };
+    const { armL, armR, barbell } = barOnBack(tr);
+    return { j: joints(tr, legL, legR, armL, armR), props: { barbell } };
   },
-  lineas(j, p) {
-    const barDown = p.props.barbell.center.clone().setY(0.005);
-    return { "barra-medio-pie": [p.props.barbell.center, barDown], "espalda-recta": [j.pelvis, j.neck] };
-  },
+  lineas: squatLines,
 };
 
 // ───────── Flexiones ─────────
@@ -110,5 +165,5 @@ const pared = {
 };
 
 export const MOTIONS = {
-  "sentadilla-barra": sentadilla, "flexiones": flexiones, "curl-mancuernas": curl, "plancha": plancha, "sentadilla-pared": pared,
+  "sentadilla-barra": sentadilla, "sentadilla-barra-video": squatFromVideo(sentadillaVideo), "flexiones": flexiones, "curl-mancuernas": curl, "plancha": plancha, "sentadilla-pared": pared,
 };

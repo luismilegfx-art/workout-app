@@ -1,0 +1,20 @@
+<!doctype html><html><body>
+<script src="package/pose.js"></script>
+<script>
+window.results = [];
+window.runAll = async (n, step = 1) => {
+  const pose = new Pose({ locateFile: f => `package/${f}` });
+  pose.setOptions({ modelComplexity: 2, smoothLandmarks: true, enableSegmentation: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+  let cur = null;
+  pose.onResults(r => { cur = r; });
+  await pose.initialize();
+  for (let i = 1; i <= n; i += step) {
+    const img = new Image(); img.src = `../video/f30/${String(i).padStart(4, "0")}.jpg`;
+    await img.decode();
+    cur = null;
+    await pose.send({ image: img });
+    window.results.push({ i, w: cur?.poseWorldLandmarks ?? null, l: cur?.poseLandmarks ?? null });
+  }
+  return window.results.length;
+};
+</script></body></html>
