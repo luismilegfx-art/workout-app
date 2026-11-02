@@ -58,7 +58,7 @@ export function summarize(log) {
   const by = new Map();
   for (const [i, x] of Object.entries(log.entries).sort((a, b) => Number(a[0]) - Number(b[0]))) {
     if (!by.has(x.id)) by.set(x.id, []);
-    by.get(x.id).push({ i: Number(i), ronda: x.ronda, reps: x.reps, peso: x.peso, pausas: x.pausas });
+    by.get(x.id).push({ i: Number(i), ronda: x.ronda, reps: x.reps, peso: x.peso, pausas: x.pausas, seg: x.seg ?? null });
   }
   return [...by.entries()].map(([id, series]) => {
     const reps = series.map(s => s.reps).filter(v => v != null);

@@ -62,7 +62,10 @@ export function openPlayer(app) {
       const forward = i > lastIndex, prev = plan.steps[lastIndex];
       if (started && forward) {
         settle(log, shown);
-        if (prev && prev !== s) markWork(lastIndex);
+        if (prev && prev !== s) {
+          markWork(lastIndex);
+          if (prev.abierto && log.entries[lastIndex]) log.entries[lastIndex].seg = runner.lastOpenSec;   // duración real de la serie
+        }
       }
       shown = started && canLogIn(s, minLog) ? [...log.pending] : [];
       lastIndex = i;
@@ -90,7 +93,7 @@ export function openPlayer(app) {
     const bar = root.querySelector(".p-progress > i");
     if (bar) bar.style.width = `${Math.min(100, runner.elapsedTotalSec / runner.totalSec * 100)}%`;
     const left = root.querySelector("[data-left]");
-    if (left) left.textContent = `${fmtClock(totalLeft())} restantes`;
+    if (left) left.textContent = series ? paceText() : `${fmtClock(totalLeft())} restantes`;
     const el = root.querySelector("[data-elapsed]");
     if (el) el.textContent = fmtClock(runner.openElapsedMs / 1000);
     const side = root.querySelector("[data-side]");
@@ -107,6 +110,56 @@ export function openPlayer(app) {
       <span class="stp-u">${unit}</span>
     </div>`;
   }
+  // ───── Ritmo en Fuerza: tiempo real, proyección y ajuste propuesto ─────
+  const series = plan.modo === "series";
+  const target = plan.minutos * 60;
+  let adjustDismissed = false;
+  function projection() {
+    const real = runner.startedAt ? (Date.now() - runner.startedAt.getTime()) / 1000 : 0;
+    const cur = runner.step;
+    const curLeft = !cur ? 0 : runner.isOpen ? Math.max(0, cur.duracion - runner.openElapsedMs / 1000) : runner.remainingMs / 1000;
+    const after = plan.steps.slice(runner.index + 1).reduce((t, x) => t + x.duracion, 0);
+    return { real, total: real + curLeft + after };
+  }
+  function paceText() {
+    const { real, total } = projection();
+    const d = Math.round((total - target) / 60);
+    const tag = Math.abs(total - target) < 60 ? "en tiempo" : d > 0 ? `+${d} min` : `${d} min`;
+    return `${fmtClock(real)} · termina ≈ ${Math.round(total / 60)} min · ${tag}`;
+  }
+  // Última serie futura de un accesorio que aún tenga más de 2 series
+  function dropCandidate() {
+    for (let k = plan.steps.length - 1; k > runner.index + 1; k--) {
+      const st = plan.steps[k];
+      if (st.tipo !== "trabajo" || !st.serie) continue;
+      const bl = plan.bloques[st.bloque];
+      if (bl.principal || bl.rondas <= 2 || st.ronda !== bl.rondas - 1) continue;
+      const restIdx = k - 1;
+      if (restIdx <= runner.index || plan.steps[restIdx].tipo !== "descanso") continue;
+      return { k, restIdx, bl, st };
+    }
+    return null;
+  }
+  function adjustPanel() {
+    if (!series || adjustDismissed || runner.isOpen || WORKISH.includes(runner.step?.tipo)) return "";
+    const over = projection().total - target;
+    if (over < (app.settings.params.fuerza.margenAjuste ?? 120)) return "";
+    const c = dropCandidate(); if (!c) return "";
+    return html`<div class="adj">
+      <span>Vas <b>+${Math.round(over / 60)} min</b> sobre lo planificado. ¿Quitar la última serie de <b>${nameOf(c.st.ejercicio)}</b>?</span>
+      <div class="row"><button class="btn small" data-action="drop-set">Quitar serie</button><button class="btn small ghost" data-action="keep-pace">Seguir así</button></div>
+    </div>`;
+  }
+  function dropSet() {
+    const c = dropCandidate(); if (!c) return;
+    plan.steps.splice(c.restIdx, 2);
+    c.bl.rondas -= 1;
+    plan.steps.forEach((x, k) => { x.i = k; if (x.bloque === c.st.bloque && x.serie) x.rondas = c.bl.rondas; });
+    plan.totalSec = sumSteps(plan.steps);
+    toast(`Quitada una serie de ${nameOf(c.st.ejercicio)}`);
+    draw();
+  }
+
   function logPanel() {
     if (!shown.length) return "";
     return html`<div class="logp">
@@ -193,6 +246,7 @@ export function openPlayer(app) {
             : isWork && nextAfter ? html`<div class="p-next">Después: <b>${nameOf(nextAfter)}</b></div>` : ""}
         </div>
         <div class="p-side">
+          ${adjustPanel()}
           ${logPanel()}
           ${ex ? techCard(ex, { last: open ? null : last }) : ""}
           ${canSwap ? html`<div class="row"><button class="btn small" data-action="swap" data-id="${ex.id}">Cambiar este ejercicio</button>
@@ -267,6 +321,8 @@ export function openPlayer(app) {
       case "next": runner.next(); break;
       case "prev": runner.prev(); break;
       case "more": runner.addTime(15); toast("+15 s"); break;
+      case "drop-set": dropSet(); break;
+      case "keep-pace": adjustDismissed = true; draw(); break;
       case "swap": {
         const newId = swapExercise(plan, t.dataset.id, app.settings);
         if (!newId) { toast("No hay otro ejercicio disponible para esa zona"); return; }

@@ -318,3 +318,5 @@ table.fmt input { width: 64px; }
 .p-weight { color: var(--accent); font-weight: 600; }
 .p-done { min-width: 240px !important; }
 @media (max-width: 480px) { .p-done { min-width: 0 !important; flex: 1; } }
+.adj { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: .95rem; }
+.warn-note { color: var(--warn); font-size: .92rem; }

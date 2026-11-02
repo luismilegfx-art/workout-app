@@ -1,6 +1,7 @@
 // Entrenar: flujo paso a paso lugar → zona → tiempo → énfasis → rutina.
 import { html, mount, raw } from "./dom.js";
-import { ZONES, EMPHASES, EQUIPMENT, PRESETS } from "../data/catalog.js";
+import { ZONES, EMPHASES, EQUIPMENT, PRESETS, GYM_EQUIPMENT } from "../data/catalog.js";
+import { setTimeStats } from "../store.js";
 import { generateRoutine } from "../engine/generator.js";
 import { mountBodyMap } from "./body-map.js";
 
@@ -18,6 +19,7 @@ function save(r) { try { localStorage.setItem(KEY, JSON.stringify(r)); } catch {
 export function newRequest(app) {
   const last = load();
   return { step: "lugar", lugar: last?.lugar ?? "casa", preset: last?.preset ?? app.settings.presetActivo,
+    equipoModo: last?.equipoModo ?? "auto", equipoElegido: last?.equipoElegido ?? [],
     zonas: {}, prioridad: [], minutos: last?.minutos ?? 30, enfasis: null, calentamiento: null, estiramiento: null };
 }
 
@@ -36,10 +38,14 @@ export function renderTrain(view, app) {
   const preset = app.settings.presetsEquipo.find(p => p.id === req.preset) ?? app.settings.presetsEquipo[0];
   const expres = req.minutos <= app.settings.params.exprésHasta;
   const zonesDone = Object.values(req.zonas).some(v => v?.length);
+  // Equipo disponible en el lugar escogido (sin el peso corporal, que siempre está)
+  const available = (req.lugar === "gym" ? GYM_EQUIPMENT : preset?.equipo ?? []).filter(q => q !== "corporal");
+  req.equipoElegido = (req.equipoElegido ?? []).filter(q => available.includes(q));
+  const chosenText = req.equipoModo === "elegir" ? (req.equipoElegido.length ? req.equipoElegido.map(q => EQUIPMENT[q]).join(", ") : "Solo peso corporal") : null;
 
   // Resumen de lo escogido: cada parte lleva a su paso
   const crumbs = [
-    { step: "lugar", text: req.lugar === "gym" ? "Gimnasio" : `Casa · ${preset?.nombre ?? ""}` },
+    { step: "lugar", text: (req.lugar === "gym" ? "Gimnasio" : `Casa · ${preset?.nombre ?? ""}`) + (chosenText ? ` · ${chosenText}` : "") },
     { step: "zona", text: zonesLabel(req) },
     { step: "tiempo", text: idx >= 2 ? `${req.minutos} min` : null },
     { step: "enfasis", text: req.enfasis ? EMPHASES[req.enfasis].nombre : null },
@@ -69,7 +75,20 @@ export function renderTrain(view, app) {
             <b>${p.nombre}</b><span>${p.equipo.filter(q => q !== "corporal").map(q => EQUIPMENT[q]).join(" · ") || "Solo peso corporal"}</span>
           </button>`)}</div>
         <span class="muted" style="font-size:.85rem">Puedes editar tus presets en Perfil.</span>
-      </section>` : ""}`;
+      </section>` : ""}
+      <section class="card">
+        <div class="spread">
+          <span class="label">Equipo para esta sesión</span>
+          <div class="seg" role="group" aria-label="Selección de equipo">
+            <button data-act="eqmode" data-v="auto" aria-pressed="${req.equipoModo !== "elegir"}">Automático</button>
+            <button data-act="eqmode" data-v="elegir" aria-pressed="${req.equipoModo === "elegir"}">Elegir</button>
+          </div>
+        </div>
+        ${req.equipoModo === "elegir" ? html`
+          <div class="chips">${available.map(q => html`<button class="chip" data-act="eq" data-v="${q}" aria-pressed="${req.equipoElegido.includes(q)}">${EQUIPMENT[q]}</button>`)}</div>
+          <span class="muted" style="font-size:.85rem">Se usan solo los que marques, sin límite. El peso corporal siempre está disponible.</span>`
+        : html`<span class="muted" style="font-size:.9rem">La app escoge hasta ${app.settings.params.maxEquipos ?? 3} de ${req.lugar === "gym" ? "los equipos del gimnasio" : "tu equipo"} y los agrupa para cambiar lo menos posible.</span>`}
+      </section>`;
   } else if (req.step === "zona") {
     body = html`<div id="bodymap"></div>`;
   } else if (req.step === "tiempo") {
@@ -121,6 +140,8 @@ export function renderTrain(view, app) {
     switch (t.dataset.act) {
       case "lugar": req.lugar = v; break;
       case "preset": req.preset = v; app.updateSettings({ presetActivo: v }); break;
+      case "eqmode": req.equipoModo = v; break;
+      case "eq": { const set = new Set(req.equipoElegido); set.has(v) ? set.delete(v) : set.add(v); req.equipoElegido = [...set]; break; }
       case "minus": req.minutos = Math.max(4, req.minutos - (req.minutos > 20 ? 5 : 1)); req.calentamiento = req.estiramiento = null; break;
       case "plus": req.minutos = Math.min(120, req.minutos + (req.minutos >= 20 ? 5 : 1)); req.calentamiento = req.estiramiento = null; break;
       case "minutes": req.minutos = Number(v); req.calentamiento = req.estiramiento = null; break;
@@ -129,7 +150,9 @@ export function renderTrain(view, app) {
       case "next": return go(STEPS[idx + 1].id);
       case "generate": {
         const ex = req.minutos <= app.settings.params.exprésHasta;
+        const elegir = req.equipoModo === "elegir";
         app.plan = generateRoutine({ minutos: req.minutos, lugar: req.lugar, preset: req.preset, zonas: req.zonas, prioridad: req.prioridad,
+          equipo: elegir ? ["corporal", ...req.equipoElegido] : undefined, maxEquipos: elegir ? Infinity : undefined, tiempoSerie: setTimeStats(),
           enfasis: req.enfasis ?? "masa", calentamiento: req.calentamiento ?? !ex, estiramiento: req.estiramiento ?? !ex }, app.settings, app.history);
         save(req); app.go("rutina"); return;
       }

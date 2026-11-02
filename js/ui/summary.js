@@ -147,7 +147,7 @@ export function renderSummary(view, app) {
         ejercicios: order.map(r => {
           const x = logged[r.id];
           return { id: r.id, intervalos: r.intervalos, completados: r.completados, medida: EXERCISE_BY_ID[r.id].medida,
-            series: x?.series.map(({ ronda, reps, peso, pausas }) => ({ ronda, reps, peso, pausas })) ?? [],
+            series: x?.series.map(({ ronda, reps, peso, pausas, seg }) => ({ ronda, reps, peso, pausas, seg })) ?? [],
             reps: x?.reps ?? null, peso: x?.peso ?? null, pausas: x?.pausas ?? null, molestia: !!form.molestia[r.id] };
         }),
       });

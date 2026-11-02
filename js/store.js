@@ -62,6 +62,19 @@ export function updateRoutine(id, patch) {
 }
 export function deleteRoutine(id) { const list = getRoutines().filter(r => r.id !== id); write(KEY_ROUTINES, list); return list; }
 
+// Duración real de las series de Fuerza: mediana personal (global y por ejercicio) de las últimas sesiones
+export function setTimeStats(limit = 20) {
+  const all = [], per = {};
+  for (const sess of getHistory().slice(0, limit)) for (const e of sess.ejercicios ?? []) for (const sr of e.series ?? []) {
+    if (!(sr.seg > 5 && sr.seg < 300)) continue;
+    all.push(sr.seg); (per[e.id] ??= []).push(sr.seg);
+  }
+  const median = arr => { const a = [...arr].sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : null; };
+  const out = { global: all.length >= 3 ? median(all) : null };
+  for (const [id, arr] of Object.entries(per)) if (arr.length >= 2) out[id] = median(arr);
+  return out;
+}
+
 export function exportData() {
   return JSON.stringify({ app: "workout-app", schema: SCHEMA_VERSION, exportado: new Date().toISOString(),
     ajustes: read(KEY_SETTINGS, {}), historial: getHistory(), rutinas: read("wa.routines.v1", []) }, null, 2);

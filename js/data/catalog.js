@@ -85,6 +85,7 @@ export const DEFAULT_SETTINGS = {
       descansoPrincipal: 150, descansoAccesorio: 90, cambioEjercicio: 90,
       serieEstimada: 40, isometrico: 40, principales: 2,
       aproximacion: true, aproximaciones: [[50, 8], [75, 3]], descansoAproximacion: 60,
+      margenAjuste: 120,   // segundos por encima de lo planificado antes de proponer quitar una serie
     },
     formatos: {
       masa:      { trabajo: [40, 50], descanso: [15, 30], descansoRonda: 60, rondas: [2, 3], porBloque: [3, 4] },

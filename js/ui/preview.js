@@ -4,7 +4,7 @@ import { EMPHASES, ZONES, PRESETS } from "../data/catalog.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
 import { generateRoutine, swapExercise, buildSteps, blockTitle, sumSteps } from "../engine/generator.js";
 import { techCard } from "./technique.js";
-import { lastLogFor, saveRoutine } from "../store.js";
+import { lastLogFor, saveRoutine, setTimeStats } from "../store.js";
 
 const open = new Set();
 
@@ -72,6 +72,7 @@ export function renderPreview(view, app) {
         <div class="stat"><div class="v">${workSteps}</div><div class="k">Intervalos de trabajo</div></div>
         <div class="stat"><div class="v">${plan.bloques.length}</div><div class="k">${plan.bloques.length === 1 ? "Bloque" : "Bloques"}</div></div>
       </div>`}
+      ${plan.sinEjercicios?.length ? html`<span class="warn-note">Con el equipo escogido no hay ejercicios para ${plan.sinEjercicios.map(z => ZONES[z].nombre).join(", ")}. Agrega equipo en el paso Lugar o quita esa zona.</span>` : ""}
       ${plan.prioridad?.length ? html`<span class="muted">Prioridad: ${plan.prioridad.map(k => { const [z, s] = k.split("."); return `${ZONES[z].nombre} ${ZONES[z].subs[s].toLowerCase()}`; }).join(", ")}</span>` : ""}
     </section>
 
@@ -111,6 +112,7 @@ export function renderPreview(view, app) {
       case "regen": {
         const r = app.request;
         app.plan = generateRoutine({ minutos: plan.minutos, lugar: plan.lugar, preset: plan.preset, zonas: plan.zonas, prioridad: plan.prioridad,
+          equipo: plan.equipoElegido ? plan.equipo : undefined, maxEquipos: plan.equipoElegido ? Infinity : undefined, tiempoSerie: setTimeStats(),
           enfasis: plan.expres ? "masa" : plan.enfasis, calentamiento: plan.calentamiento.length > 0, estiramiento: plan.estiramiento.length > 0 },
           app.settings, app.history);
         if (r) r.step = "enfasis";

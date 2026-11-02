@@ -15,6 +15,7 @@ export class SessionRunner {
     this.endsAt = 0;          // ms (performance.now) en que termina el paso actual
     this.pausedLeft = 0;      // ms restantes guardados al pausar
     this.openStart = 0;       // inicio del paso abierto actual
+    this.lastOpenSec = null;  // segundos reales de la última serie abierta
     this.lastSec = null;
     this.fired = new Set();
     this.startedAt = null;
@@ -96,7 +97,10 @@ export class SessionRunner {
   toggle() { this.paused ? this.resume() : this.pause(); return this.paused; }
   // Siguiente: en un paso abierto equivale a "Serie completada"
   next() {
-    if (this.isOpen && this.step.tipo === "trabajo") this.completed.add(this.index);
+    if (this.isOpen) {
+      this.lastOpenSec = Math.round(this.openElapsedMs / 1000);   // duración real de la serie
+      if (this.step.tipo === "trabajo") this.completed.add(this.index);
+    }
     this.goTo(this.index + 1);
   }
   prev() {

@@ -157,3 +157,28 @@ test("Fuerza: series abiertas con objetivo de reps, principales primero con apro
     if (r.bloques[0].aproximacion) assert.equal(r.steps.slice(0, firstWork).some(s => s.tipo === "aproximacion"), true);
   }
 });
+
+test("equipo elegido: se usa solo ese equipo y sin el límite automático", () => {
+  const equipo = ["corporal", "barra", "banco", "mancuernas", "kettlebell", "balon", "dominadas"];
+  let maxSeen = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const r = generateRoutine({ minutos: 60, zonas: PRESETS.completo.sel, lugar: "casa", equipo, maxEquipos: Infinity, enfasis: "masa", seed }, settings);
+    const used = new Set(ids(r).flatMap(id => EXERCISE_BY_ID[id].equipo.filter(q => q !== "corporal")));
+    for (const q of used) assert.ok(equipo.includes(q), q);
+    maxSeen = Math.max(maxSeen, used.size);
+  }
+  assert.ok(maxSeen > 3, `nunca pasó de ${maxSeen} equipos`);
+});
+
+test("avisa las zonas que quedan sin ejercicios con el equipo elegido", () => {
+  const r = generateRoutine({ minutos: 30, zonas: { brazos: ["antebrazo"], pecho: ["superior", "medio"] }, lugar: "casa", equipo: ["corporal"], enfasis: "masa", seed: 1 }, settings);
+  assert.deepEqual(r.sinEjercicios, ["brazos"]);
+});
+
+test("Fuerza planifica con la duración real de tus series", () => {
+  const base = generateRoutine({ minutos: 45, zonas: PRESETS.push.sel, lugar: "gym", enfasis: "fuerza", seed: 4 }, settings);
+  const slow = generateRoutine({ minutos: 45, zonas: PRESETS.push.sel, lugar: "gym", enfasis: "fuerza", seed: 4, tiempoSerie: { global: 70 } }, settings);
+  const setsOf = r => r.steps.filter(s => s.tipo === "trabajo").length;
+  assert.ok(setsOf(slow) <= setsOf(base), `${setsOf(slow)} vs ${setsOf(base)}`);
+  assert.ok(Math.abs(slow.totalSec - 45 * 60) / (45 * 60) <= 0.1);
+});

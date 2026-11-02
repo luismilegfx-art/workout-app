@@ -1,6 +1,6 @@
 // Rutinas guardadas: calificación, carpeta, comentario; usar o borrar.
 import { html, mount, fmtMin, fmtDate, confirmInPage, toast } from "./dom.js";
-import { getRoutines, updateRoutine, deleteRoutine } from "../store.js";
+import { getRoutines, updateRoutine, deleteRoutine, setTimeStats } from "../store.js";
 import { buildSteps, sumSteps } from "../engine/generator.js";
 import { planLabel, emphasisLabel, placeLabel } from "./preview.js";
 
@@ -66,6 +66,7 @@ export function renderRoutines(view, app) {
       case "star": { const n = Number(t.dataset.v); updateRoutine(r.id, { estrellas: r.estrellas === n ? 0 : n }); break; }
       case "use": {
         const plan = structuredClone(r.plan);
+        if (plan.modo === "series") plan.tiempoSerie = setTimeStats();   // tus tiempos de serie más recientes
         plan.steps = buildSteps(plan, app.settings); plan.totalSec = sumSteps(plan.steps);
         Object.assign(plan, { fromRoutine: true, saved: true, routineId: r.id, nombre: r.nombre || planLabel(r.plan) });
         app.plan = plan; app.go("rutina"); return;

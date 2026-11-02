@@ -136,7 +136,8 @@ function exerciseWeight(e, ctx) {
   if (ctx.enfasis === "condicion" || ctx.enfasis === "expres") w *= (e.patron === "potencia" || !e.carga) ? 1.5 : 0.8;
   if (ctx.lugar === "gym" && e.equipo.some(q => q === "maquina" || q === "polea")) w *= 1.2;
   const g = gearOf(e);
-  if (g.length && g.every(q => ctx.gear.has(q))) w *= 1.6;   // reutilizar el equipo que ya está a la mano
+  if (ctx.maxGear === Infinity) { if (g.some(q => !ctx.gear.has(q))) w *= 1.6; }   // equipo elegido: repartir entre todo lo elegido
+  else if (g.length && g.every(q => ctx.gear.has(q))) w *= 1.6;                      // automático: reutilizar lo que ya está a la mano
   return w;
 }
 
@@ -233,7 +234,7 @@ export function generateRoutine(req, settings, history = []) {
   }
 
   const ctx = { settings, pool, used: new Set(), recent: recentIds(history), enfasis, lugar: req.lugar, blockPatterns: new Set(),
-    selected: new Set(units.flatMap(u => u.subs.map(s => `${u.zona}.${s}`))), gear: new Set(), maxGear: p.maxEquipos ?? 3 };
+    selected: new Set(units.flatMap(u => u.subs.map(s => `${u.zona}.${s}`))), gear: new Set(), maxGear: req.maxEquipos ?? p.maxEquipos ?? 3 };
   if (enfasis === "fuerza") return strengthPlan({ req, settings, history, rng, seed, units, equip, pool, ctx, warm, cool, workSec, totalSec, zona: bodyZone(units) });
 
   const fmt = p.formatos[enfasis];
@@ -250,17 +251,18 @@ export function generateRoutine(req, settings, history = []) {
 
   const musculos = [...new Set(bloques.flatMap(b => b.ejercicios.map(id => EXERCISE_BY_ID[id].musculo)))];
   const zona = bodyZone(units);
+  const sinEjercicios = expres ? [] : missingZones(req, bloques);   // exprés usa una sola zona a propósito
   const plan = {
     id: `r-${Date.now().toString(36)}-${seed.toString(36)}`,
     seed, creada: new Date().toISOString(),
     minutos: req.minutos, lugar: req.lugar, preset: req.lugar === "casa" ? (req.preset ?? settings.presetActivo) : null,
-    equipo: [...equip], enfasis, expres,
+    equipo: [...equip], equipoElegido: req.maxEquipos === Infinity, enfasis, expres,
     zonas: Object.fromEntries(units.map(u => [u.zona, u.subs])),
     prioridad: units.flatMap(u => u.prio.map(s => `${u.zona}.${s}`)),
     formato: { trabajo: f.trabajo, descanso: f.descanso, descansoRonda: f.descansoRonda },
     calentamiento: pickAuxiliary("calentamiento", zona, warm.n, ctx, rng, musculos),
     estiramiento: pickAuxiliary("estiramiento", zona, cool.n, ctx, rng, musculos),
-    bloques,
+    bloques, sinEjercicios,
   };
 
   // 7. Ajuste final al tiempo total, con transiciones y unilaterales (doble tiempo) ya incluidos.
@@ -304,18 +306,27 @@ export function generateRoutine(req, settings, history = []) {
 }
 
 
+// Zonas escogidas que no quedaron en la rutina (por ejemplo, sin ejercicios con el equipo elegido)
+function missingZones(req, bloques) {
+  const asked = Object.keys(normalizeTargets(req).reduce((o, u) => (o[u.zona] = 1, o), {}));
+  const got = new Set(bloques.flatMap(b => b.ejercicios.map(id => EXERCISE_BY_ID[id].sub.split(".")[0])));
+  return asked.filter(z => !got.has(z));
+}
+
 // ───────── Fuerza: series por repeticiones ─────────
 // Cada bloque es un ejercicio con sus series. Los principales (compuestos) van primero, con descanso largo
 // y series de aproximación si llevan carga; los accesorios, con descanso más corto.
 function strengthPlan({ req, settings, history, rng, seed, units, equip, pool, ctx, warm, cool, workSec, totalSec, zona }) {
   const p = settings.params, F = p.fuerza;
-  const aproxSec = Math.round(F.serieEstimada * 0.6);
+  const tiempos = req.tiempoSerie ?? {};
+  const serieSec = tiempos.global ?? F.serieEstimada;          // la duración real de tus series, si ya hay historial
+  const aproxSec = Math.round(serieSec * 0.6);
   const estimate = (n, sets) => {
     let t = (n - 1) * F.cambioEjercicio;
     for (let k = 0; k < n; k++) {
       const main = k < F.principales;
       if (main && F.aproximacion) t += F.aproximaciones.length * (aproxSec + F.descansoAproximacion);
-      t += sets * F.serieEstimada + (sets - 1) * (main ? F.descansoPrincipal : F.descansoAccesorio);
+      t += sets * serieSec + (sets - 1) * (main ? F.descansoPrincipal : F.descansoAccesorio);
     }
     return t;
   };
@@ -347,13 +358,14 @@ function strengthPlan({ req, settings, history, rng, seed, units, equip, pool, c
   const plan = {
     id: `r-${Date.now().toString(36)}-${seed.toString(36)}`, seed, creada: new Date().toISOString(),
     minutos: req.minutos, lugar: req.lugar, preset: req.lugar === "casa" ? (req.preset ?? settings.presetActivo) : null,
-    equipo: [...equip], enfasis: "fuerza", expres: false, modo: "series",
+    equipo: [...equip], equipoElegido: req.maxEquipos === Infinity, enfasis: "fuerza", expres: false, modo: "series",
     zonas: Object.fromEntries(units.map(u => [u.zona, u.subs])),
     prioridad: units.flatMap(u => u.prio.map(s => `${u.zona}.${s}`)),
-    formato: { serie: F.serieEstimada, descansoPrincipal: F.descansoPrincipal, descansoAccesorio: F.descansoAccesorio },
+    formato: { serie: serieSec, descansoPrincipal: F.descansoPrincipal, descansoAccesorio: F.descansoAccesorio },
+    tiempoSerie: tiempos,
     calentamiento: pickAuxiliary("calentamiento", zona, warm.n, ctx, rng, musculos),
     estiramiento: pickAuxiliary("estiramiento", zona, cool.n, ctx, rng, musculos),
-    bloques,
+    bloques, sinEjercicios: missingZones(req, bloques),
   };
 
   // Ajuste al tiempo: series por ejercicio y segundos de descanso
@@ -387,7 +399,9 @@ function strengthPlan({ req, settings, history, rng, seed, units, equip, pool, c
 
 function buildSeriesSteps(plan, settings, push) {
   const F = settings.params.fuerza;
-  const aproxSec = Math.round(F.serieEstimada * 0.6);
+  const t = plan.tiempoSerie ?? {};
+  const serieOf = id => t[id] ?? t.global ?? F.serieEstimada;
+  const aproxSec = Math.round((t.global ?? F.serieEstimada) * 0.6);
   plan.bloques.forEach((bl, b) => {
     const id = bl.ejercicios[0], e = EXERCISE_BY_ID[id];
     const fase = `Ejercicio ${b + 1} de ${plan.bloques.length}`;
@@ -400,7 +414,7 @@ function buildSeriesSteps(plan, settings, push) {
     for (let r = 0; r < bl.rondas; r++) {
       const timed = e.medida === "tiempo";
       push({ tipo: "trabajo", ejercicio: id, abierto: !timed, objetivo: timed ? null : bl.reps,
-        duracion: timed ? F.isometrico * (e.unilateral ? 2 : 1) : F.serieEstimada * (e.unilateral ? 2 : 1),
+        duracion: timed ? F.isometrico * (e.unilateral ? 2 : 1) : serieOf(id) * (e.unilateral && !t[id] ? 2 : 1),
         cambioLado: e.unilateral && timed, bloque: b, ronda: r, rondas: bl.rondas, slot: 0, fase, serie: true });
       const last = r === bl.rondas - 1, end = last && b === plan.bloques.length - 1;
       if (end) break;
