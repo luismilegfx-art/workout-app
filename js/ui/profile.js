@@ -78,6 +78,7 @@ export function renderProfile(view, app) {
         ${num("pasoEstiramiento", "Por estiramiento", p.pasoEstiramiento, "s", 'min="15" max="90" step="5"')}
         ${num("exprésHasta", "Exprés hasta", p.exprésHasta, "min", 'min="4" max="15"')}
         ${num("margenTiempo", "Margen sobre el tiempo", p.margenTiempo, "%", 'min="1" max="15"')}
+        ${num("registroMinDescanso", "Descanso mínimo para anotar", p.registroMinDescanso, "s", 'min="0" max="60" step="5"')}
       </div>
       <div class="table-wrap">
         <table class="fmt">

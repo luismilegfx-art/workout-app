@@ -247,15 +247,40 @@ export function generateRoutine(req, settings, history = []) {
     bloques,
   };
 
-  // 7. Ajuste final al tiempo total, con las transiciones reales incluidas
+  // 7. Ajuste final al tiempo total, con transiciones y unilaterales (doble tiempo) ya incluidos.
+  //    Búsqueda voraz: ajustar segundos de trabajo y, si no basta, rondas de algún bloque.
   const margin = totalSec * p.margenTiempo / 100;
-  let steps = buildSteps(plan, settings), dur = sumSteps(steps);
   const lo = fmt.trabajo[0] - 10, hi = fmt.trabajo[1] + 10;
-  for (let guard = 0; guard < 20 && Math.abs(dur - totalSec) > margin; guard++) {
-    const next = plan.formato.trabajo + (dur > totalSec ? -5 : 5);
-    if (next < lo || next > hi) break;
-    plan.formato.trabajo = next; steps = buildSteps(plan, settings); dur = sumSteps(steps);
+  const maxRounds = fmt.rondas[1] + 1;
+  const measure = () => sumSteps(buildSteps(plan, settings));
+  let dur = measure();
+  for (let guard = 0; guard < 40 && Math.abs(dur - totalSec) > margin; guard++) {
+    const moves = [];
+    for (const d of [-5, 5]) {
+      const t = plan.formato.trabajo + d;
+      if (t >= lo && t <= hi) moves.push({ cost: 0, apply: () => { plan.formato.trabajo += d; }, undo: () => { plan.formato.trabajo -= d; } });
+    }
+    for (const b of plan.bloques) for (const d of [-1, 1]) {
+      const r = b.rondas + d;
+      if (r >= 1 && r <= maxRounds) moves.push({ cost: 20, apply: () => { b.rondas += d; }, undo: () => { b.rondas -= d; } });
+    }
+    // Si sobra tiempo por los unilaterales (doble duración), cambiar uno por un bilateral de la misma subzona
+    if (dur > totalSec) for (const b of plan.bloques) b.ejercicios.forEach((id, j) => {
+      const e = EXERCISE_BY_ID[id]; if (!e.unilateral) return;
+      const inPlan = new Set(plan.bloques.flatMap(x => x.ejercicios));
+      const alt = pool.find(x => x.sub === e.sub && !x.unilateral && !inPlan.has(x.id) && x.nivel <= settings.nivel + 1);
+      if (alt) moves.push({ cost: 10, apply: () => { b.ejercicios[j] = alt.id; }, undo: () => { b.ejercicios[j] = id; } });
+    });
+    let best = null;
+    for (const m of moves) {
+      m.apply(); const err = Math.abs(measure() - totalSec) + m.cost; m.undo();
+      if (!best || err < best.err) best = { m, err };
+    }
+    if (!best || best.err - best.m.cost >= Math.abs(dur - totalSec)) break;   // ningún movimiento mejora
+    best.m.apply(); dur = measure();
   }
+  plan.bloques.forEach(b => { b.trabaja = [...new Set(b.ejercicios.map(id => EXERCISE_BY_ID[id].sub))]; });
+  const steps = buildSteps(plan, settings);
   plan.steps = steps;
   plan.totalSec = dur;
   return plan;
@@ -291,7 +316,7 @@ export function buildSteps(plan, settings) {
     for (let r = 0; r < bl.rondas; r++) {
       bl.ejercicios.forEach((id, j) => {
         const e = EXERCISE_BY_ID[id];
-        push({ tipo: "trabajo", ejercicio: id, duracion: trabajo, bloque: b, ronda: r, slot: j,
+        push({ tipo: "trabajo", ejercicio: id, duracion: e.unilateral ? trabajo * 2 : trabajo, bloque: b, ronda: r, slot: j,
           fase: `Bloque ${b + 1} · ${blockTitle(bl)}`, rondas: bl.rondas, cambioLado: e.unilateral });
         const lastInRound = j === bl.ejercicios.length - 1;
         const nextId = !lastInRound ? bl.ejercicios[j + 1]

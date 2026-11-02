@@ -1,23 +1,27 @@
 // Reproductor: pantalla de entrenamiento guiado por tiempo, legible a distancia.
+// En los descansos se anota lo que se hizo en el intervalo anterior (precargado; se guarda solo).
 import { html, fmtClock, confirmInPage, toast } from "./dom.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
 import { EQUIPMENT } from "../data/catalog.js";
 import { SessionRunner } from "../engine/runner.js";
 import { say, beep, unlockAudio, stopSpeech } from "../engine/voice.js";
-import { swapExercise } from "../engine/generator.js";
+import { swapExercise, buildSteps, sumSteps } from "../engine/generator.js";
+import { createLog, markDone, canLogIn, settle, update, PAUSE_OPTIONS, DEFAULT_REPS } from "../engine/session-log.js";
 import { techCard } from "./technique.js";
 import { lastLogFor } from "../store.js";
 
 const STATE = { preparacion: "prep", calentamiento: "aux", estiramiento: "aux", trabajo: "work" };
 const WORKISH = ["trabajo", "calentamiento", "estiramiento"];
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 let wakeLock = null;
 
 async function keepAwake() {
-  try { wakeLock = await navigator.wakeLock?.request("screen"); } catch { wakeLock = null; }
+  try { wakeLock = await navigator.wakeLock?.request("screen"); wakeLock?.addEventListener?.("release", () => { wakeLock = null; }); }
+  catch { wakeLock = null; }
 }
 function onVisibility() { if (document.visibilityState === "visible" && wakeLock === null) keepAwake(); }
 
-function nameOf(id) { return EXERCISE_BY_ID[id]?.nombre ?? ""; }
+const nameOf = id => EXERCISE_BY_ID[id]?.nombre ?? "";
 
 function announce(step, prev) {
   const e = EXERCISE_BY_ID[step.ejercicio];
@@ -29,10 +33,7 @@ function announce(step, prev) {
       const newRound = step.slot === 0 && step.ronda > 0 && prev?.tipo === "descanso-ronda";
       return newRound ? `Ronda ${step.ronda + 1}. ${e.nombre}` : e.nombre;
     }
-    case "transicion": {
-      const next = EXERCISE_BY_ID[step.siguiente];
-      return `Cambia el equipo. Próximo: ${next?.nombre ?? ""}`;
-    }
+    case "transicion": return `Cambia el equipo. Próximo: ${nameOf(step.siguiente)}`;
     case "descanso-ronda": return `Descanso. Luego ronda ${step.ronda + 2}`;
     case "cambio-bloque": return `Cambio de bloque. Próximo: ${nameOf(step.siguiente)}`;
     default: return step.siguiente ? `Descanso. Próximo: ${nameOf(step.siguiente)}` : "Descanso";
@@ -41,30 +42,47 @@ function announce(step, prev) {
 
 export function openPlayer(app) {
   const plan = app.plan;
+  const minLog = app.settings.params.registroMinDescanso ?? 15;
   const layer = document.getElementById("layer");
   const root = document.createElement("div");
   root.className = "player"; root.setAttribute("role", "dialog"); root.setAttribute("aria-label", "Sesión en curso");
   layer.appendChild(root);
   document.body.style.overflow = "hidden";
 
-  let started = false;
+  const log = createLog();
+  let shown = [];          // intervalos que se están anotando en este descanso
+  let started = false, lastIndex = 0;
+
+  const markWork = i => {
+    const s = plan.steps[i];
+    if (s?.tipo === "trabajo") markDone(log, s, lastLogFor(s.ejercicio));
+  };
+
   const runner = new SessionRunner(plan.steps, {
     step: (s, i) => {
+      const forward = i > lastIndex, prev = plan.steps[lastIndex];
+      if (started && forward) {
+        settle(log, shown);
+        if (prev && prev !== s) markWork(lastIndex);
+      }
+      shown = started && canLogIn(s, minLog) ? [...log.pending] : [];
+      lastIndex = i;
       draw();
       if (!started) return;
+      if (forward && prev && WORKISH.includes(prev.tipo) && !WORKISH.includes(s.tipo)) beep("stop");
+      if (WORKISH.includes(s.tipo)) beep("go");
       say(announce(s, plan.steps[i - 1]));
-      if (s.tipo === "trabajo" && i > 0 && !WORKISH.includes(plan.steps[i - 1].tipo)) beep("go");
     },
     tick: () => drawClock(),
-    cue: (name, s, data) => {
-      if (name.startsWith("cuenta-")) beep("tick");
-      if (name === "cambio-lado") say("Cambia de lado");
+    cue: (name, s) => {
+      if (name.startsWith("cuenta-") && !WORKISH.includes(s.tipo)) beep("tick");
+      if (name === "cambio-lado") { beep("side"); say("Cambia de lado"); }
       if (name === "diez") say("Diez segundos", { interrupt: false });
     },
-    finish: stats => close(stats, true),
+    finish: stats => { markWork(runner.index); close(stats, true); },
   });
 
-  function totalLeft() { return Math.max(0, runner.totalSec - runner.elapsedTotalSec); }
+  const totalLeft = () => Math.max(0, runner.totalSec - runner.elapsedTotalSec);
 
   function drawClock() {
     const s = runner.step; if (!s) return;
@@ -74,24 +92,58 @@ export function openPlayer(app) {
     if (bar) bar.style.width = `${Math.min(100, runner.elapsedTotalSec / runner.totalSec * 100)}%`;
     const left = root.querySelector("[data-left]");
     if (left) left.textContent = `${fmtClock(totalLeft())} restantes`;
+    const side = root.querySelector("[data-side]");
+    if (side) side.textContent = runner.remainingMs / 1000 > s.duracion / 2 ? "Primer lado" : "Segundo lado";
     root.dataset.paused = String(runner.paused);
+  }
+
+  // ───── Panel de registro ─────
+  function stepperHTML(i, field, value, unit, label) {
+    return html`<div class="stp" data-i="${i}" data-field="${field}">
+      <button class="stp-b" data-log="dec" aria-label="Menos ${label}">−</button>
+      <input class="stp-v" type="number" inputmode="decimal" id="log-${field}-${i}" value="${value ?? ""}" placeholder="—" aria-label="${label}">
+      <button class="stp-b" data-log="inc" aria-label="Más ${label}">+</button>
+      <span class="stp-u">${unit}</span>
+    </div>`;
+  }
+  function logPanel() {
+    if (!shown.length) return "";
+    return html`<div class="logp">
+      <div class="logp-head"><span class="label">Anota lo que hiciste</span><span class="muted">Se guarda solo</span></div>
+      ${shown.map(i => {
+        const x = log.entries[i], e = EXERCISE_BY_ID[x.id], st = plan.steps[i];
+        return html`<div class="logp-row">
+          <div class="logp-name"><b>${e.nombre}</b><span class="muted">${st.rondas > 1 ? `Ronda ${st.ronda + 1}` : ""}</span></div>
+          ${x.medida === "tiempo"
+            ? html`<div class="pauses" role="group" aria-label="Pausas en ${e.nombre}">${PAUSE_OPTIONS.map(o =>
+                html`<button class="chip" data-log="pausas" data-i="${i}" data-v="${o.v}" aria-pressed="${x.pausas === o.v}">${o.label}</button>`)}</div>`
+            : stepperHTML(i, "reps", x.reps, "reps", `repeticiones de ${e.nombre}`)}
+          ${e.carga ? stepperHTML(i, "peso", x.peso, "lb", `peso de ${e.nombre}`) : ""}
+        </div>`;
+      })}
+    </div>`;
+  }
+  function setValue(i, field, v) {
+    update(log, i, { [field]: v });
+    const input = root.querySelector(`#log-${field}-${i}`);
+    if (input && document.activeElement !== input) input.value = v ?? "";
   }
 
   function draw() {
     const s = runner.step ?? plan.steps[0];
     const isWork = WORKISH.includes(s.tipo);
     const shownId = isWork ? s.ejercicio : s.siguiente;
-    const shown = EXERCISE_BY_ID[shownId];
-    const state = STATE[s.tipo] ?? "rest";
-    root.dataset.state = state;
+    const ex = EXERCISE_BY_ID[shownId];
+    root.dataset.state = STATE[s.tipo] ?? "rest";
     const phase = s.tipo === "trabajo" ? `${s.fase} · Ronda ${s.ronda + 1}/${s.rondas}`
       : isWork ? `${s.fase} · ${s.paso}/${s.pasos}`
       : s.tipo === "preparacion" ? "Prepárate"
       : s.tipo === "transicion" ? "Cambio de equipo"
       : s.tipo === "cambio-bloque" ? "Cambio de bloque" : "Descanso";
     const nextAfter = isWork ? s.siguiente : plan.steps.slice(runner.index + 1).find(x => x.ejercicio && x.ejercicio !== s.siguiente)?.ejercicio;
-    const canSwap = shown && shown.tipo === "principal";
-    const equipNote = s.tipo === "transicion" && shown ? `Prepara: ${shown.equipo.filter(q => q !== "corporal").map(q => EQUIPMENT[q]).join(", ")}` : "";
+    const canSwap = ex && ex.tipo === "principal";
+    const equipNote = s.tipo === "transicion" && ex ? `Prepara: ${ex.equipo.filter(q => q !== "corporal").map(q => EQUIPMENT[q]).join(", ")}` : "";
+    const workLabel = s.tipo === "trabajo" ? (ex?.medida === "tiempo" ? "Sostén" : "Trabajo") : s.fase;
 
     root.innerHTML = String(html`
       <div>
@@ -106,15 +158,17 @@ export function openPlayer(app) {
       </div>
       <div class="p-body">
         <div class="p-main">
-          <span class="p-phase">${isWork ? (s.tipo === "trabajo" ? "Trabajo" : s.fase) : (s.tipo === "preparacion" ? "Empieza en" : "Descanso")}</span>
+          <span class="p-phase">${isWork ? workLabel : (s.tipo === "preparacion" ? "Empieza en" : "Descanso")}</span>
           <div class="p-clock" aria-live="off">${fmtClock(runner.remainingMs / 1000 || s.duracion)}</div>
-          <div class="p-name">${isWork ? shown?.nombre : html`<span class="muted">Próximo:</span> ${shown?.nombre ?? "Fin"}`}</div>
+          <div class="p-name">${isWork ? ex?.nombre : html`<span class="muted">Próximo:</span> ${ex?.nombre ?? "Fin"}`}</div>
+          ${isWork && s.cambioLado ? html`<div class="p-next"><b data-side></b> · cambia a la mitad</div>` : ""}
           ${equipNote ? html`<div class="p-next">${equipNote}</div>` : ""}
           ${isWork && nextAfter ? html`<div class="p-next">Después: <b>${nameOf(nextAfter)}</b></div>` : ""}
         </div>
         <div class="p-side">
-          ${shown ? techCard(shown, { last: shown.carga ? lastLogFor(shown.id) : null }) : ""}
-          ${canSwap ? html`<div class="row"><button class="btn small" data-action="swap" data-id="${shown.id}">Cambiar este ejercicio</button>
+          ${logPanel()}
+          ${ex ? techCard(ex, { last: ex.carga ? lastLogFor(ex.id) : null }) : ""}
+          ${canSwap ? html`<div class="row"><button class="btn small" data-action="swap" data-id="${ex.id}">Cambiar este ejercicio</button>
             ${!isWork ? html`<button class="btn small" data-action="more">+15 s de descanso</button>` : ""}</div>` : ""}
         </div>
       </div>
@@ -123,14 +177,17 @@ export function openPlayer(app) {
           <button class="btn" data-action="prev" aria-label="Anterior">Anterior</button>
           <button class="btn primary p-play" data-action="toggle">${runner.paused ? "Seguir" : "Pausa"}</button>
           <button class="btn" data-action="next" aria-label="Siguiente">Siguiente</button>`
-        : html`<button class="btn primary p-play" data-action="begin">Comenzar</button>`}
+        : html`<div class="stack" style="align-items:center;gap:6px">
+            <button class="btn primary p-play" data-action="begin">Comenzar</button>
+            ${isIOS ? html`<span class="muted" style="font-size:.8rem">Si no escuchas los sonidos, revisa que el iPhone no esté en silencio.</span>` : ""}
+          </div>`}
       </div>`);
     drawClock();
   }
 
   async function close(stats, finished) {
     runner.stop(); stopSpeech();
-    if (finished) { say("Sesión completada. Buen trabajo."); beep("end"); }
+    if (finished) { beep("end"); say("Sesión completada. Buen trabajo."); }
     try { await wakeLock?.release(); } catch {}
     wakeLock = null;
     document.removeEventListener("visibilitychange", onVisibility);
@@ -138,7 +195,7 @@ export function openPlayer(app) {
     document.body.style.overflow = "";
     root.remove();
     if (!stats) return;
-    app.result = { plan, stats, finished };
+    app.result = { plan, stats, finished, log };
     app.plan = null;
     app.go("resumen");
   }
@@ -150,7 +207,28 @@ export function openPlayer(app) {
     if (e.code === "ArrowLeft") runner.prev();
   }
 
+  root.addEventListener("change", e => {
+    const input = e.target.closest(".stp-v"); if (!input) return;
+    const box = input.closest(".stp");
+    setValue(Number(box.dataset.i), box.dataset.field, input.value === "" ? null : Math.max(0, Number(input.value)));
+  });
+
   root.addEventListener("click", async e => {
+    const lg = e.target.closest("[data-log]");
+    if (lg) {
+      if (lg.dataset.log === "pausas") {
+        const i = Number(lg.dataset.i);
+        update(log, i, { pausas: Number(lg.dataset.v) });
+        lg.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === lg)));
+        return;
+      }
+      const box = lg.closest(".stp"), i = Number(box.dataset.i), field = box.dataset.field;
+      const cur = log.entries[i][field];
+      const step = field === "peso" ? 5 : 1, dir = lg.dataset.log === "inc" ? 1 : -1;
+      const next = cur == null ? (field === "reps" ? DEFAULT_REPS : 0) : Math.max(0, cur + dir * step);
+      setValue(i, field, next);
+      return;
+    }
     const t = e.target.closest("[data-action]"); if (!t) return;
     switch (t.dataset.action) {
       case "begin":
@@ -164,14 +242,18 @@ export function openPlayer(app) {
       case "more": runner.addTime(15); toast("+15 s"); break;
       case "swap": {
         const newId = swapExercise(plan, t.dataset.id, app.settings);
-        if (!newId) { toast("No hay otro ejercicio disponible para ese grupo"); return; }
+        if (!newId) { toast("No hay otro ejercicio disponible para esa zona"); return; }
+        // Un unilateral nuevo cambia la duración: se reconstruye la línea de tiempo manteniendo la posición
+        const fresh = buildSteps(plan, app.settings);
+        if (fresh.length === plan.steps.length) fresh.forEach((st, k) => Object.assign(plan.steps[k], st));
+        plan.totalSec = sumSteps(plan.steps);
         say(`Cambio: ${nameOf(newId)}`); draw(); break;
       }
       case "end": {
         if (!started) { close(null, false); app.go("rutina"); return; }
         const wasPaused = runner.paused; runner.pause(); draw();
-        const ok = await confirmInPage({ title: "¿Terminar la sesión?", body: "Podrás registrar lo que completaste.", ok: "Terminar", cancel: "Seguir entrenando" });
-        if (ok) close({ inicio: runner.startedAt, fin: new Date(), completados: [...runner.completed], hastaPaso: runner.index }, false);
+        const ok = await confirmInPage({ title: "¿Terminar la sesión?", body: "Podrás revisar y completar lo anotado.", ok: "Terminar", cancel: "Seguir entrenando" });
+        if (ok) { markWork(runner.index); close({ inicio: runner.startedAt, fin: new Date(), completados: [...runner.completed], hastaPaso: runner.index }, false); }
         else { if (!wasPaused) runner.resume(); draw(); }
         break;
       }

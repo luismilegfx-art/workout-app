@@ -283,3 +283,30 @@ table.fmt input { width: 64px; }
 .routine:last-child { border-bottom: 0; }
 .routine-name { font-weight: 700; font-size: 1.05rem; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; margin-left: -6px; width: 100%; }
 .routine-name:hover, .routine-name:focus { border-color: var(--line); }
+
+/* ───── registro durante el descanso ───── */
+.logp { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.logp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.logp-head .muted { font-size: .8rem; }
+.logp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.logp-head + .logp-row { border-top: 0; padding-top: 0; }
+.logp-name { display: flex; flex-direction: column; min-width: 0; flex: 1 1 160px; }
+.logp-name .muted { font-size: .82rem; }
+.stp { display: inline-flex; align-items: center; gap: 6px; }
+.stp-b { width: 48px; height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font-size: 1.5rem; line-height: 1; font-weight: 600; }
+.stp-b:active { background: var(--line); }
+.stp-v { width: 72px; height: 48px; text-align: center; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+  font-family: var(--display); font-weight: 800; font-size: 1.7rem; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+.stp-v::-webkit-outer-spin-button, .stp-v::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stp-u { color: var(--muted); font-size: .85rem; font-weight: 600; min-width: 2.2em; }
+.pauses { display: flex; flex-wrap: wrap; gap: 6px; }
+.pauses .chip { padding: 8px 12px; }
+.pauses .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+/* ───── resumen de la sesión ───── */
+.sum-ex { padding: 12px 0; border-bottom: 1px dashed var(--line); }
+.sum-ex:last-child { border-bottom: 0; }
+.sum-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sum-series { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.sum-serie { display: grid; grid-template-columns: 80px 120px 120px; gap: 10px; align-items: center; }
+@media (max-width: 420px) { .sum-serie { grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr); } }

@@ -77,6 +77,7 @@ export const DEFAULT_SETTINGS = {
     exprésHasta: 8,        // minutos: hasta aquí la sesión es exprés (una sola zona, sin descanso)
     pasoCalentamiento: 40, pasoEstiramiento: 30,  // segundos por ejercicio
     margenTiempo: 5,       // ± % aceptado sobre el tiempo total
+    registroMinDescanso: 15, // segundos: descansos más cortos acumulan el registro hasta uno más largo
     formatos: {
       fuerza:    { trabajo: [45, 60], descanso: [45, 60], descansoRonda: 90, rondas: [2, 3], porBloque: [2, 3] },
       masa:      { trabajo: [40, 50], descanso: [15, 30], descansoRonda: 60, rondas: [2, 3], porBloque: [3, 4] },

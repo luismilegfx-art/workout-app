@@ -117,3 +117,10 @@ test("no sale de las subzonas escogidas aunque falten ejercicios (Pull con solo 
     for (const id of ids(r)) assert.ok(allowed.has(EXERCISE_BY_ID[id].sub), `${id} (${EXERCISE_BY_ID[id].sub})`);
   }
 });
+
+test("los ejercicios unilaterales duran el doble (tiempo completo por lado)", () => {
+  const r = generateRoutine({ minutos: 45, zonas: { piernas: ["cuadriceps", "gluteos"] }, lugar: "casa", enfasis: "masa", seed: 1 }, settings);
+  const work = r.steps.filter(s => s.tipo === "trabajo");
+  const uni = work.find(s => EXERCISE_BY_ID[s.ejercicio].unilateral), bi = work.find(s => !EXERCISE_BY_ID[s.ejercicio].unilateral);
+  if (uni && bi) assert.equal(uni.duracion, bi.duracion * 2);
+});

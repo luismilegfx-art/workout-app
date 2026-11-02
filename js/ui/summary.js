@@ -1,17 +1,23 @@
-// Registro al terminar: lo completado, peso y repeticiones, esfuerzo (RIR) y molestias.
+// Resumen al terminar: lo anotado durante la sesión (editable), esfuerzo, molestias, calificación y guardado.
 import { html, mount, fmtMin, toast, confirmInPage } from "./dom.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
 import { addSession, lastLogFor, saveRoutine, updateRoutine } from "../store.js";
+import { markDone, summarize, PAUSE_OPTIONS } from "../engine/session-log.js";
 import { planLabel, emphasisLabel, placeLabel } from "./preview.js";
 
 const RIR_OPTIONS = ["0", "1", "2", "3", "4+"];
+const pauseLabel = v => PAUSE_OPTIONS.find(o => o.v === v)?.label ?? "—";
 
 export function renderSummary(view, app) {
   const { plan, stats, finished } = app.result;
-  const form = app.result.form ??= { rir: null, notas: "", ex: {}, estrellas: 0, guardar: !plan.saved && !plan.fromRoutine };
+  const log = app.result.log ??= { entries: {}, pending: [] };
+  const form = app.result.form ??= { rir: null, notas: "", molestia: {}, estrellas: 0, guardar: !plan.saved && !plan.fromRoutine, open: new Set() };
   const done = new Set(stats.completados);
 
-  // Ejercicios principales en orden, con cuántos intervalos se hicieron
+  // Intervalos que se hicieron pero no llegaron a anotarse (sesión terminada antes, sin descansos largos)
+  plan.steps.forEach((s, i) => { if (s.tipo === "trabajo" && i <= stats.hastaPaso) markDone(log, s, lastLogFor(s.ejercicio)); });
+
+  // Ejercicios principales en orden, con cuántos intervalos se planificaron y completaron
   const order = [];
   plan.steps.forEach((s, i) => {
     if (s.tipo !== "trabajo") return;
@@ -19,9 +25,19 @@ export function renderSummary(view, app) {
     if (!row) { row = { id: s.ejercicio, intervalos: 0, completados: 0 }; order.push(row); }
     row.intervalos++; if (done.has(i)) row.completados++;
   });
+  const logged = Object.fromEntries(summarize(log).map(x => [x.id, x]));
   const totalDone = order.reduce((t, r) => t + r.completados, 0);
   const totalAll = order.reduce((t, r) => t + r.intervalos, 0);
   const durSec = Math.round((new Date(stats.fin) - new Date(stats.inicio)) / 1000);
+
+  const seriesText = (e, x) => {
+    if (!x || (e.medida === "reps" && x.series.every(s => s.reps == null) && x.peso == null)) return "Sin anotar · toca Editar para completarlo";
+    const parts = e.medida === "tiempo"
+      ? x.series.map(s => s.pausas === 0 ? "completo" : pauseLabel(s.pausas).toLowerCase())
+      : x.series.map(s => s.reps ?? "—");
+    const unit = e.medida === "tiempo" ? "" : " reps";
+    return `${parts.join(" · ")}${unit}${x.peso ? ` · ${x.peso} lb` : ""}`;
+  };
 
   mount(view, html`
     <div class="spread">
@@ -38,8 +54,38 @@ export function renderSummary(view, app) {
     <section class="card">
       <div class="summary-strip">
         <div class="stat"><div class="v">${fmtMin(durSec)}</div><div class="k">Duración</div></div>
-        <div class="stat"><div class="v mono">${totalDone}/${totalAll}</div><div class="k">Intervalos de trabajo</div></div>
+        <div class="stat"><div class="v mono">${totalDone}/${totalAll}</div><div class="k">Intervalos completados</div></div>
       </div>
+    </section>
+
+    <section class="card">
+      <div class="stack" style="gap:2px">
+        <h3>Lo que anotaste</h3>
+        <span class="muted">Revisa o corrige antes de guardar. Esto alimenta tu progresión.</span>
+      </div>
+      <div>${order.map(r => {
+        const e = EXERCISE_BY_ID[r.id], x = logged[r.id], isOpen = form.open.has(r.id);
+        return html`<div class="sum-ex">
+          <div class="sum-row">
+            <div class="stack" style="gap:0;min-width:0">
+              <b>${e.nombre}</b>
+              <span class="ex-meta">${seriesText(e, x)}</span>
+            </div>
+            <div class="row" style="flex-wrap:nowrap">
+              <label class="check" style="font-size:.88rem"><input type="checkbox" id="mol-${r.id}" data-mol="${r.id}" ${form.molestia[r.id] ? "checked" : ""}> Molestia</label>
+              <button class="btn small ghost" data-action="edit" data-id="${r.id}" aria-expanded="${isOpen}">${isOpen ? "Listo" : "Editar"}</button>
+            </div>
+          </div>
+          ${isOpen && x ? html`<div class="sum-series">${x.series.map(s => html`<div class="sum-serie">
+            <span class="muted">Ronda ${s.ronda + 1}</span>
+            ${e.medida === "tiempo"
+              ? html`<select class="input" id="pa-${s.i}" data-i="${s.i}" data-field="pausas" aria-label="Pausas ronda ${s.ronda + 1}">${PAUSE_OPTIONS.map(o =>
+                  html`<option value="${o.v}" ${o.v === s.pausas ? "selected" : ""}>${o.label}</option>`)}</select>`
+              : html`<input class="input" type="number" inputmode="numeric" min="0" id="re-${s.i}" data-i="${s.i}" data-field="reps" value="${s.reps ?? ""}" placeholder="reps" aria-label="Repeticiones ronda ${s.ronda + 1}">`}
+            ${e.carga ? html`<input class="input" type="number" inputmode="decimal" min="0" step="2.5" id="pe-${s.i}" data-i="${s.i}" data-field="peso" value="${s.peso ?? ""}" placeholder="lb" aria-label="Peso ronda ${s.ronda + 1}">` : ""}
+          </div>`)}</div>` : ""}
+        </div>`;
+      })}</div>
     </section>
 
     <section class="card">
@@ -60,47 +106,29 @@ export function renderSummary(view, app) {
       <div class="stars" role="group" aria-label="Calificación">${[1, 2, 3, 4, 5].map(n => html`<button data-action="star" data-value="${n}" class="${n <= form.estrellas ? "on" : ""}" aria-label="${n} estrellas">★</button>`)}</div>
       ${plan.fromRoutine || plan.saved ? html`<span class="muted">Esta rutina ya está en Rutinas; se actualizará su calificación.</span>`
         : html`<label class="check"><input type="checkbox" id="save-routine" ${form.guardar ? "checked" : ""}> Guardar esta rutina en Rutinas</label>`}
-    </section>
-
-    <section class="card">
-      <div class="stack" style="gap:2px">
-        <h3>Registro por ejercicio</h3>
-        <span class="muted">Opcional. Repeticiones promedio por intervalo y peso en ${app.settings.unidad}. Esto alimenta la progresión.</span>
-      </div>
-      <div>
-        ${order.map(r => {
-          const e = EXERCISE_BY_ID[r.id]; const f = form.ex[r.id] ?? {}; const last = lastLogFor(r.id);
-          return html`<div class="log-row">
-            <div class="stack" style="gap:0;min-width:0">
-              <b>${e.nombre}</b>
-              <span class="ex-meta">${r.completados}/${r.intervalos} intervalos${last ? ` · última vez ${last.peso ? `${last.peso} lb` : ""}${last.peso && last.reps ? " × " : ""}${last.reps ? `${last.reps}` : ""}` : ""}</span>
-            </div>
-            <input class="input" type="number" inputmode="numeric" min="0" placeholder="Reps" aria-label="Repeticiones de ${e.nombre}"
-              id="reps-${r.id}" data-ex="${r.id}" data-field="reps" value="${f.reps ?? ""}">
-            ${e.carga ? html`<input class="input" type="number" inputmode="decimal" min="0" step="2.5" placeholder="lb" aria-label="Peso de ${e.nombre}"
-              id="peso-${r.id}" data-ex="${r.id}" data-field="peso" value="${f.peso ?? ""}">` : html`<span class="muted" style="font-size:.85rem">Corporal</span>`}
-            <label class="check"><input type="checkbox" id="mol-${r.id}" data-ex="${r.id}" data-field="molestia" ${f.molestia ? "checked" : ""}> Molestia</label>
-          </div>`;
-        })}
-      </div>
       <div class="field">
-        <label class="label" for="notas">Notas</label>
-        <input class="input" id="notas" data-field="notas" placeholder="Cómo te sentiste, qué cambiar…" value="${form.notas}">
+        <label class="label" for="notas">Comentario</label>
+        <input class="input" id="notas" placeholder="Cómo te sentiste, para qué día es buena…" value="${form.notas}">
       </div>
     </section>
   `);
 
-  view.oninput = e => {
-    const t = e.target; const field = t.dataset.field; if (!field) return;
+  view.onchange = e => {
+    const t = e.target;
     if (t.id === "save-routine") { form.guardar = t.checked; return; }
-    if (field === "notas") { form.notas = t.value; return; }
-    const ex = form.ex[t.dataset.ex] ??= {};
-    ex[field] = t.type === "checkbox" ? t.checked : t.value === "" ? null : Number(t.value);
+    if (t.id === "notas") { form.notas = t.value; return; }
+    if (t.dataset.mol) { form.molestia[t.dataset.mol] = t.checked; return; }
+    if (t.dataset.i) {
+      const entry = log.entries[t.dataset.i]; if (!entry) return;
+      entry[t.dataset.field] = t.value === "" ? null : Number(t.value);
+      renderSummary(view, app);
+    }
   };
-  view.onchange = view.oninput;
+  view.oninput = e => { if (e.target.id === "notas") form.notas = e.target.value; };
 
   view.onclick = async e => {
     const t = e.target.closest("[data-action]"); if (!t) return;
+    if (t.dataset.action === "edit") { const id = t.dataset.id; form.open.has(id) ? form.open.delete(id) : form.open.add(id); renderSummary(view, app); return; }
     if (t.dataset.action === "rir") { form.rir = t.dataset.value; renderSummary(view, app); return; }
     if (t.dataset.action === "star") { const n = Number(t.dataset.value); form.estrellas = form.estrellas === n ? 0 : n; renderSummary(view, app); return; }
     if (t.dataset.action === "discard") {
@@ -109,15 +137,19 @@ export function renderSummary(view, app) {
       return;
     }
     if (t.dataset.action === "save") {
-      const molestias = order.filter(r => form.ex[r.id]?.molestia).map(r => r.id);
+      const molestias = order.filter(r => form.molestia[r.id]).map(r => r.id);
       addSession({
         id: `s-${Date.now().toString(36)}`,
         fecha: new Date(stats.inicio).toISOString(),
         zonas: plan.zonas, prioridad: plan.prioridad, lugar: plan.lugar, preset: plan.preset, enfasis: plan.enfasis, expres: plan.expres,
         nombre: plan.nombre ?? planLabel(plan), rutinaId: plan.routineId ?? null, minutosPlan: plan.minutos, duracionSeg: durSec, completa: finished,
         formato: plan.formato, rir: form.rir, notas: form.notas || null,
-        ejercicios: order.map(r => ({ id: r.id, intervalos: r.intervalos, completados: r.completados,
-          reps: form.ex[r.id]?.reps ?? null, peso: form.ex[r.id]?.peso ?? null, molestia: !!form.ex[r.id]?.molestia })),
+        ejercicios: order.map(r => {
+          const x = logged[r.id];
+          return { id: r.id, intervalos: r.intervalos, completados: r.completados, medida: EXERCISE_BY_ID[r.id].medida,
+            series: x?.series.map(({ ronda, reps, peso, pausas }) => ({ ronda, reps, peso, pausas })) ?? [],
+            reps: x?.reps ?? null, peso: x?.peso ?? null, pausas: x?.pausas ?? null, molestia: !!form.molestia[r.id] };
+        }),
       });
       if (plan.routineId) updateRoutine(plan.routineId, { ultimaVez: new Date().toISOString(), ...(form.estrellas ? { estrellas: form.estrellas } : {}), ...(form.notas ? { comentario: form.notas } : {}) });
       else if (form.guardar) saveRoutine(plan, { nombre: `${planLabel(plan)} · ${placeLabel(plan, app.settings)} · ${plan.minutos} min`, estrellas: form.estrellas, comentario: form.notas, ultimaVez: new Date().toISOString() });

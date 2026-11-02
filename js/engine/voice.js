@@ -40,16 +40,27 @@ export function say(text, { interrupt = true } = {}) {
 
 export function stopSpeech() { if ("speechSynthesis" in window) speechSynthesis.cancel(); }
 
+// Sonidos de la sesión, distintos para reconocerlos sin mirar la pantalla:
+// tick: cuenta 3-2-1 · go: empieza un ejercicio · stop: termina un ejercicio · side: cambia de lado · end: fin de la sesión
+const SOUNDS = {
+  tick: [[740, 0, 0.12, 0.30]],
+  go:   [[880, 0, 0.10, 0.35], [1320, 0.10, 0.40, 0.40]],
+  stop: [[880, 0, 0.16, 0.35], [587, 0.16, 0.30, 0.35]],
+  side: [[660, 0, 0.10, 0.25], [660, 0.16, 0.10, 0.25]],
+  end:  [[523, 0, 0.18, 0.35], [659, 0.18, 0.18, 0.35], [784, 0.36, 0.45, 0.40]],
+};
+
 export function beep(kind = "tick") {
   if (!enabled.pitidos || !audioCtx) return;
-  const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-  const freq = { tick: 660, go: 990, end: 520 }[kind] ?? 660;
-  const len = kind === "tick" ? 0.12 : 0.35;
-  osc.frequency.value = freq; osc.type = "sine";
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start(t); osc.stop(t + len + 0.02);
+  const t0 = audioCtx.currentTime;
+  for (const [freq, at, len, vol] of SOUNDS[kind] ?? SOUNDS.tick) {
+    const t = t0 + at;
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.frequency.value = freq; osc.type = "sine";
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + len + 0.02);
+  }
 }
