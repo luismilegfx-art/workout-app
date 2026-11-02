@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bot de Demostración</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<script type="importmap">
+  { "imports": {
+      "three": "../third_party/three/three.module.min.js",
+      "three/addons/controls/OrbitControls.js": "../third_party/three/OrbitControls.js",
+      "three/addons/environments/RoomEnvironment.js": "../third_party/three/RoomEnvironment.js"
+  } }
+</script>
+<style>
+/* Escenario 3D a la izquierda, panel de control a la derecha (debajo en el teléfono). Tema oscuro fijo, como la sala de entrenamiento. */
+:root {
+  --bg: #0f1112; --surface: #171a1c; --surface-2: #1f2326; --line: #2c3135; --fg: #ece8e1; --muted: #9b9a93;
+  --accent: #c9a25b; --accent-fg: #15130f; --fixed: #7fa3bd;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.label { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+.app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+@media (max-width: 860px) { .app { grid-template-columns: 1fr; grid-template-rows: 64vh auto; height: auto; } }
+
+.stage { position: relative; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.view { position: relative; flex: 1; min-height: 0; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.tag3d { position: absolute; left: 0; top: 0; font-size: .74rem; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+  background: rgb(15 17 18 / .78); border: 1px solid var(--line); color: var(--fg); white-space: nowrap; }
+
+.hud-tl { position: absolute; top: max(16px, env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; display: flex; flex-direction: column; gap: 2px; max-width: 60%; }
+.hud-tl h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(1.5rem, 3.2vw, 2.4rem); line-height: 1; text-transform: uppercase; }
+.hud-tr { position: absolute; top: max(16px, env(safe-area-inset-top, 0px)); right: 16px; text-align: right; pointer-events: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.phase { font-family: var(--display); font-weight: 800; font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: .9; text-transform: uppercase; color: var(--accent); }
+.count { font-family: var(--mono); font-size: 1.1rem; color: var(--muted); }
+.breath { font-weight: 600; font-size: 1rem; }
+.breath::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--fixed); margin-right: 8px; transform: scale(var(--b, 1)); transition: transform .3s; }
+.hud-bl { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; pointer-events: none; flex-wrap: wrap; }
+.cue { max-width: 52ch; font-size: 1rem; font-weight: 500; background: rgb(15 17 18 / .7); padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--accent); }
+.angle { font-family: var(--mono); font-size: .9rem; background: rgb(15 17 18 / .7); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); }
+.angle b { font-size: 1.15rem; color: var(--fg); }
+.angle .ok { color: #74b585; } .angle .out { color: var(--muted); }
+.hint { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); white-space: nowrap; font-size: .8rem; color: var(--muted); pointer-events: none; transition: opacity .6s; }
+
+.panel { border-left: 1px solid var(--line); background: var(--surface); overflow: auto; display: flex; flex-direction: column; gap: 18px;
+  padding-block: 20px; padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); }
+@media (max-width: 860px) { .panel { border-left: 0; border-top: 1px solid var(--line); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); } }
+.panel h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 1.4rem; text-transform: uppercase; }
+.panel .sub { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+.group { display: flex; flex-direction: column; gap: 8px; }
+.ex-btn { text-align: left; border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 9px 12px; display: flex; flex-direction: column; gap: 1px; }
+.ex-btn b { font-weight: 600; }
+.ex-btn span { font-size: .8rem; color: var(--muted); }
+.ex-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+.row { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 8px 12px; font-weight: 600; font-size: .9rem; }
+.btn[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); min-width: 96px; }
+.toggle { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: .92rem; }
+.toggle:last-child { border-bottom: 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 1px; }
+.switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .2s; flex: none; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--fg); transition: transform .2s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(16px); }
+.note { font-size: .8rem; color: var(--muted); }
+.webgl-error { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
+@media (max-width: 860px) {
+  .app { grid-template-rows: auto auto; }
+  .view { height: 58vh; flex: none; }
+  .hud-bl { position: static; padding: 10px 16px 14px; background: var(--bg); }
+  .cue { background: transparent; padding: 4px 10px; font-size: .95rem; }
+  .hud-tl { max-width: 58%; } .hud-tl h1 { font-size: 1.35rem; }
+  .phase { font-size: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) { .breath::before, .hint { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage" id="stage">
+    <div class="view">
+      <canvas id="c" aria-label="Demostración 3D del ejercicio. Arrastra para girar."></canvas>
+      <div class="labels" id="labels"></div>
+    </div>
+    <div class="hud-tl"><span class="label" id="zone"></span><h1 id="title"></h1></div>
+    <div class="hud-tr" aria-live="polite">
+      <div class="phase" id="phase"></div>
+      <div class="count" id="count"></div>
+      <div class="breath" id="breath"></div>
+    </div>
+    <div class="hud-bl"><div class="cue" id="cue"></div><div class="angle" id="angle"></div></div>
+  </div>
+
+  <aside class="panel">
+    <div>
+      <h2>Bot de demostración</h2>
+      <div class="sub">Prueba con cinco ejercicios para decidir el estilo antes de hacer la biblioteca completa.</div>
+    </div>
+
+    <div class="group">
+      <span class="label">Ejercicio</span>
+      <div class="group" id="exList"></div>
+    </div>
+
+    <div class="group">
+      <span class="label">Reproducción</span>
+      <div class="row">
+        <button class="btn primary" id="play">Pausa</button>
+        <button class="btn" data-speed="0.5" aria-pressed="false">0.5×</button>
+        <button class="btn" data-speed="1" aria-pressed="true">1×</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <span class="label">Vista</span>
+      <div class="row">
+        <button class="btn" data-view="rec">Recomendada</button>
+        <button class="btn" data-view="front">Frente</button>
+        <button class="btn" data-view="side">Lado</button>
+        <button class="btn" data-view="back">Espalda</button>
+      </div>
+      <label class="toggle"><span>Girar sola</span><input type="checkbox" class="switch" id="autorot"></label>
+      <span class="note">Arrastra la figura para girarla 360° mientras se mueve; rueda o pellizca para acercar.</span>
+    </div>
+
+    <div class="group">
+      <span class="label">Puntos clave</span>
+      <div>
+        <label class="toggle"><span><i class="swatch" style="background:#f2c879"></i>Músculo trabajado</span><input type="checkbox" class="switch" data-opt="musculo" checked></label>
+        <label class="toggle"><span><i class="swatch" style="background:#7fa3bd"></i>Lo que no debe moverse</span><input type="checkbox" class="switch" data-opt="fijas" checked></label>
+        <label class="toggle"><span><i class="swatch" style="background:#f2c879"></i>Dirección del movimiento</span><input type="checkbox" class="switch" data-opt="flecha" checked></label>
+        <label class="toggle"><span><i class="swatch" style="background:#ece8e1"></i>Líneas de alineación</span><input type="checkbox" class="switch" data-opt="lineas" checked></label>
+      </div>
+      <span class="note">El brillo del músculo sube cuando el esfuerzo es mayor (al subir en la sentadilla, al empujar en la flexión).</span>
+    </div>
+  </aside>
+</div>
+
+<script type="module">
+import { createBot } from "./bot/scene.js";
+import { BOT_EXERCISES, sample } from "./bot/exercises.js";
+import { angleAt } from "./bot/rig.js";
+
+const $ = id => document.getElementById(id);
+const opts = { musculo: true, fijas: true, flecha: true, lineas: true };
+let ex = BOT_EXERCISES[0], playing = true, speed = 1, clock = 0, last = performance.now(), prevJ = null;
+
+let bot;
+try { bot = createBot($("c"), $("labels")); window.__bot = bot; }
+catch (e) { $("stage").insertAdjacentHTML("beforeend", `<div class="webgl-error">Este navegador no puede mostrar gráficos 3D (WebGL). Prueba en Chrome o Safari actualizado.</div>`); throw e; }
+
+$("exList").innerHTML = BOT_EXERCISES.map((e, i) =>
+  `<button class="ex-btn" data-i="${i}" aria-pressed="${i === 0}"><b>${e.nombre}</b><span>${e.zona}${e.isometrico ? " · isométrico" : ""}</span></button>`).join("");
+
+function selectExercise(i) {
+  ex = BOT_EXERCISES[i]; clock = 0; prevJ = null;
+  document.querySelectorAll(".ex-btn").forEach((b, k) => b.setAttribute("aria-pressed", String(k === i)));
+  $("title").textContent = ex.nombre; $("zone").textContent = ex.zona;
+  bot.setExercise(ex);
+}
+// Parámetros para revisar una posición exacta: ?ex=2&t=1.5 (ejercicio y segundo del ciclo, en pausa)
+const qs = new URLSearchParams(location.search);
+selectExercise(Math.min(BOT_EXERCISES.length - 1, Number(qs.get("ex") ?? 0)));
+if (qs.has("t")) { clock = Number(qs.get("t")); playing = false; $("play").textContent = "Seguir"; }
+if (qs.has("az")) bot.setView({ ...ex.vista, az: Number(qs.get("az")) }, true);
+
+$("exList").addEventListener("click", e => { const b = e.target.closest(".ex-btn"); if (b) selectExercise(Number(b.dataset.i)); });
+$("play").addEventListener("click", () => { playing = !playing; $("play").textContent = playing ? "Pausa" : "Seguir"; });
+document.querySelectorAll("[data-speed]").forEach(b => b.addEventListener("click", () => {
+  speed = Number(b.dataset.speed);
+  document.querySelectorAll("[data-speed]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+}));
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => {
+  const v = ex.vista, az = { rec: v.az, front: 0, side: 90, back: 180 }[b.dataset.view];
+  bot.setView({ ...v, az, el: b.dataset.view === "rec" ? v.el : 8 });
+}));
+$("autorot").addEventListener("change", e => bot.setAutoRotate(e.target.checked));
+document.querySelectorAll("[data-opt]").forEach(c => c.addEventListener("change", () => { opts[c.dataset.opt] = c.checked; }));
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (playing) clock += dt * speed;
+  const s = sample(ex, clock);
+  const pose = ex.pose(s.t, clock);
+  const j = pose.j;
+  const vel = prevJ && ex.flecha ? j[ex.flecha].clone().sub(prevJ[ex.flecha]).divideScalar(Math.max(dt * speed, 1e-3)) : null;
+  prevJ = j;
+  bot.update(pose, ex, opts, { esfuerzo: s.fase.esfuerzo, time: clock, vel: playing ? vel : null });
+
+  // HUD: fase, cuenta, respiración, indicación y ángulo en vivo
+  $("phase").textContent = s.fase.fase;
+  $("count").textContent = ex.isometrico ? `${Math.floor(clock % s.total) + 1} s` : `${Math.max(1, Math.ceil(s.restante))}`;
+  $("breath").textContent = s.fase.resp || "—";
+  const br = ex.isometrico ? 1 + 0.35 * Math.sin(clock * 2 * Math.PI / 3) : s.fase.resp.startsWith("Exhala") ? 0.7 : 1.3;
+  $("breath").style.setProperty("--b", br.toFixed(2));
+  $("cue").textContent = s.fase.cue;
+  // Ángulo en vista lateral (plano Y-Z), como lo mide la cámara de perfil
+  const [a, b, c] = ex.angulo.puntos.map(k => j[k].clone().setX(0));
+  const ang = Math.round(angleAt(a, b, c)), [lo, hi] = ex.angulo.rango;
+  $("angle").innerHTML = `${ex.angulo.nombre} <b>${ang}°</b> <span class="${ang >= lo - 2 && ang <= hi + 2 ? "ok" : "out"}">rango ${lo}–${hi}°</span>`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
