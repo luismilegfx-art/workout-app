@@ -37,7 +37,7 @@ function fromFicha(f, modelo = f.movimiento.modelo, variante = null) {
 // Todos los ejercicios con movimiento disponible, en el orden de la prueba.
 // Las variantes muestran otro modelo de movimiento para la misma ficha (por ejemplo, el extraído de video) para compararlos.
 const ORDEN = ["sentadilla-barra", "flexiones", "curl-mancuernas", "plancha", "sentadilla-pared"];
-const VARIANTES = { "sentadilla-barra": [{ modelo: "sentadilla-barra-video", nombre: "desde video" }] };
+const VARIANTES = {};   // p. ej. { "sentadilla-barra": [{ modelo: "sentadilla-barra-video", nombre: "desde video" }] }
 export const BOT_EXERCISES = EXERCISES.filter(e => e.movimiento && MOTIONS[e.movimiento.modelo])
   .sort((a, b) => (ORDEN.indexOf(a.id) + 1 || 99) - (ORDEN.indexOf(b.id) + 1 || 99))
   .flatMap(f => [fromFicha(f), ...(VARIANTES[f.id] ?? []).filter(x => MOTIONS[x.modelo]).map(x => fromFicha(f, x.modelo, x.nombre))]);
