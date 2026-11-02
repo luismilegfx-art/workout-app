@@ -174,9 +174,11 @@ function selectExercise(i) {
   $("title").textContent = ex.nombre; $("zone").textContent = ex.zona;
   bot.setExercise(ex);
 }
-// Parámetros para revisar una posición exacta: ?ex=2&t=1.5 (ejercicio y segundo del ciclo, en pausa)
+// Parámetros para revisar una posición exacta: ?ex=curl-mancuernas&t=1.5 (ejercicio por id o posición, y segundo del ciclo, en pausa)
 const qs = new URLSearchParams(location.search);
-selectExercise(Math.min(BOT_EXERCISES.length - 1, Number(qs.get("ex") ?? 0)));
+const qEx = qs.get("ex") ?? "0";
+const byId = BOT_EXERCISES.findIndex(e => e.id === qEx);
+selectExercise(byId >= 0 ? byId : Math.max(0, Math.min(BOT_EXERCISES.length - 1, Number(qEx) || 0)));
 if (qs.has("t")) { clock = Number(qs.get("t")); playing = false; $("play").textContent = "Seguir"; }
 if (qs.has("az")) bot.setView({ ...ex.vista, az: Number(qs.get("az")) }, true);
 

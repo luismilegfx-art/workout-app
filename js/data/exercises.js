@@ -1,5 +1,5 @@
-// Biblioteca inicial de ejercicios.
-// Cada registro sigue el modelo de datos de la especificación técnica.
+// Biblioteca de ejercicios: una ficha por ejercicio (formato en js/data/exercise-schema.js).
+// La leen la biblioteca, el generador, el bot de demostración y la cámara.
 // El usuario puede activar/desactivar ejercicios desde Ajustes; los cambios se guardan aparte (store.js),
 // así esta lista sirve como base y se puede ampliar sin perder lo que el usuario configuró.
 
@@ -49,8 +49,12 @@ function ex(d) {
     tecnica: d.tecnica,
     respiracion: d.respiracion,
     error: d.error,
-    demostracion: d.demostracion ?? null,
-    camara: d.camara ?? null,               // id de la regla de cámara (sentadilla, triceps…) cuando existe
+    camara: d.camara ?? null,               // id de la regla de cámara del prototipo (sentadilla, triceps…); pasa a `control`
+    // Demostración y corrección (ver exercise-schema.js)
+    tempo: d.tempo ?? null,
+    control: { angulo: d.control?.angulo ?? null, fijas: d.control?.fijas ?? [], alineaciones: d.control?.alineaciones ?? [] },
+    tension: d.tension ?? null,
+    movimiento: d.movimiento ?? null,
     transicion: d.transicion ?? (equipo.includes("barra") ? TRANSICION.barra
       : equipo.some(e => ["mancuernas", "kettlebell", "maquina", "polea"].includes(e)) ? TRANSICION.pesas
       : equipo.some(e => ["banco", "balon", "dominadas"].includes(e)) ? TRANSICION.ligero
@@ -101,7 +105,19 @@ export const EXERCISES = [
   ex({ id: "flexiones", nombre: "Flexiones", musculo: "pecho", secundarios: ["triceps", "hombros"], patron: "empuje-horizontal", nivel: 1,
     facil: "flexiones-rodillas", dificil: "flexiones-pies-elevados",
     tecnica: ["Manos un poco más abiertas que los hombros", "Cuerpo en línea recta de cabeza a talones", "Codos a unos 45° del torso"],
-    respiracion: "Inhala al bajar, exhala al empujar", error: "Dejar caer la cadera" }),
+    respiracion: "Inhala al bajar, exhala al empujar", error: "Dejar caer la cadera",
+    tempo: [
+      { fase: "Arriba", desde: 0, hasta: 0, dur: 0.7, resp: "Inhala", esfuerzo: 0.3, cue: "Cuerpo en línea recta de la cabeza a los talones" },
+      { fase: "Baja", desde: 0, hasta: 1, dur: 2.0, resp: "Inhala al bajar", esfuerzo: 0.6, cue: "Codos a unos 45° del torso, no abiertos hacia los lados" },
+      { fase: "Abajo", desde: 1, hasta: 1, dur: 0.3, resp: "", esfuerzo: 0.8, cue: "El pecho casi toca el suelo" },
+      { fase: "Sube", desde: 1, hasta: 0, dur: 1.1, resp: "Exhala al empujar", esfuerzo: 1, cue: "Empuja el suelo sin dejar caer la cadera" },
+    ],
+    control: {
+      angulo: { nombre: "Codo", puntos: ["shoulderL", "elbowL", "wristL"], rango: [60, 180] },
+      alineaciones: [{ id: "cuerpo-recto", texto: "Cuerpo en línea recta" }],
+    },
+    tension: { articulacion: "elbowL", carga: "chest" },
+    movimiento: { fuente: "manual", modelo: "flexiones", vista: { az: 70, el: 14, radius: 0.95, target: [0, 0.32, 0.72] }, accesorios: ["mat"], trayectoria: "chest" } }),
   ex({ id: "flexiones-rodillas", nombre: "Flexiones con rodillas", musculo: "pecho", secundarios: ["triceps"], patron: "empuje-horizontal", nivel: 1,
     dificil: "flexiones",
     tecnica: ["Rodillas apoyadas, cadera alineada con el torso", "Baja el pecho entre las manos"],
@@ -206,7 +222,20 @@ export const EXERCISES = [
   // ───────────── Bíceps ─────────────
   ex({ id: "curl-mancuernas", nombre: "Curl de bíceps con mancuernas", equipo: ["mancuernas"], musculo: "biceps", patron: "aislamiento", nivel: 1,
     tecnica: ["Codos pegados al torso", "Gira las palmas hacia arriba al subir"],
-    respiracion: "Exhala al subir, inhala al bajar", error: "Balancear el cuerpo" }),
+    respiracion: "Exhala al subir, inhala al bajar", error: "Balancear el cuerpo",
+    tempo: [
+      { fase: "Abajo", desde: 0, hasta: 0, dur: 0.5, resp: "Inhala", esfuerzo: 0.2, cue: "Brazos casi estirados, palmas al frente" },
+      { fase: "Sube", desde: 0, hasta: 1, dur: 1.0, resp: "Exhala al subir", esfuerzo: 1, cue: "Solo se mueve el codo; los hombros quietos" },
+      { fase: "Aprieta", desde: 1, hasta: 1, dur: 0.5, resp: "", esfuerzo: 0.9, cue: "Aprieta el bíceps arriba un instante" },
+      { fase: "Baja", desde: 1, hasta: 0, dur: 2.0, resp: "Inhala al bajar", esfuerzo: 0.5, cue: "Baja lento y controlado, sin balancear el cuerpo" },
+    ],
+    control: {
+      angulo: { nombre: "Codo", puntos: ["shoulderL", "elbowL", "wristL"], rango: [45, 170] },
+      fijas: [{ puntos: ["elbowL", "elbowR"], texto: "Codos pegados al torso" }],
+      alineaciones: [{ id: "codo-bajo-hombro", texto: "El codo no se adelanta" }],
+    },
+    tension: { articulacion: "elbowL", carga: "handL" },
+    movimiento: { fuente: "manual", modelo: "curl-mancuernas", vista: { az: 38, el: 6, radius: 0.98, target: [0, 0.88, 0] }, accesorios: ["dumbbells"], trayectoria: "wristL" } }),
   ex({ id: "curl-martillo", nombre: "Curl martillo", equipo: ["mancuernas"], musculo: "biceps", secundarios: ["antebrazo"], patron: "aislamiento-neutro", nivel: 1,
     tecnica: ["Palmas mirándose entre sí", "Codos fijos, sube controlado"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Mover los codos hacia adelante" }),
@@ -259,7 +288,20 @@ export const EXERCISES = [
   ex({ id: "sentadilla-barra", nombre: "Sentadilla con barra", equipo: ["barra"], musculo: "cuadriceps", secundarios: ["gluteos", "isquios"], patron: "sentadilla", nivel: 2, camara: "sentadilla",
     facil: "sentadilla-goblet",
     tecnica: ["Barra sobre la parte alta de la espalda", "Abdomen firme antes de bajar", "Baja hasta que la cadera quede al nivel de la rodilla"],
-    respiracion: "Inhala y aprieta el abdomen antes de bajar, exhala al subir", error: "Talones despegados del suelo" }),
+    respiracion: "Inhala y aprieta el abdomen antes de bajar, exhala al subir", error: "Talones despegados del suelo",
+    tempo: [
+      { fase: "Prepárate", desde: 0, hasta: 0, dur: 0.9, resp: "Inhala y aprieta el abdomen", esfuerzo: 0.15, cue: "Barra sobre la parte alta de la espalda, pies al ancho de los hombros" },
+      { fase: "Baja", desde: 0, hasta: 1, dur: 2.0, resp: "Mantén el aire", esfuerzo: 0.55, cue: "Cadera atrás y rodillas en la dirección de las puntas" },
+      { fase: "Abajo", desde: 1, hasta: 1, dur: 0.5, resp: "Mantén el aire", esfuerzo: 0.8, cue: "Cadera a la altura de las rodillas, pecho arriba" },
+      { fase: "Sube", desde: 1, hasta: 0, dur: 1.2, resp: "Exhala al subir", esfuerzo: 1, cue: "Empuja el suelo con todo el pie; la barra sube en línea recta" },
+    ],
+    control: {
+      angulo: { nombre: "Rodilla", puntos: ["hipL", "kneeL", "ankleL"], rango: [65, 178] },
+      fijas: [{ puntos: ["heelL", "heelR"], texto: "Talones apoyados" }],
+      alineaciones: [{ id: "barra-medio-pie", texto: "Barra sobre el medio del pie" }, { id: "espalda-recta", texto: "Espalda recta" }],
+    },
+    tension: { articulacion: "kneeL", carga: "chest" },
+    movimiento: { fuente: "manual", modelo: "sentadilla-barra", vista: { az: 62, el: 8, radius: 1.0, target: [0, 0.86, 0] }, accesorios: ["barbell"], trayectoria: "pelvis" } }),
   ex({ id: "zancadas", nombre: "Zancadas alternas", musculo: "cuadriceps", secundarios: ["gluteos"], patron: "zancada", nivel: 1,
     dificil: "sentadilla-bulgara",
     tecnica: ["Paso largo hacia adelante", "Ambas rodillas a unos 90°", "Alterna piernas"],
@@ -278,7 +320,15 @@ export const EXERCISES = [
     respiracion: "Exhala al saltar", error: "Aterrizar con las rodillas rígidas" }),
   ex({ id: "sentadilla-pared", medida: "tiempo", nombre: "Sentadilla isométrica en pared", musculo: "cuadriceps", secundarios: ["gluteos"], patron: "isometrico", nivel: 1,
     tecnica: ["Espalda completamente apoyada en la pared", "Baja hasta que los muslos queden paralelos al suelo, rodillas a 90°", "Rodillas sobre los tobillos, peso en los talones"],
-    respiracion: "Respira lento y constante, sin aguantar el aire", error: "Rodillas por delante de los pies o espalda despegada de la pared" }),
+    respiracion: "Respira lento y constante, sin aguantar el aire", error: "Rodillas por delante de los pies o espalda despegada de la pared",
+    tempo: [{ fase: "Sostén", desde: 0, hasta: 0, dur: 6, resp: "Respira lento, sin aguantar el aire", esfuerzo: 0.85, cue: "Muslos paralelos al suelo, peso en los talones" }],
+    control: {
+      angulo: { nombre: "Rodilla", puntos: ["hipL", "kneeL", "ankleL"], rango: [85, 95] },
+      fijas: [{ puntos: ["pelvis"], texto: "Espalda pegada a la pared" }, { puntos: ["kneeL"], texto: "Rodillas sobre los tobillos" }],
+      alineaciones: [{ id: "rodilla-tobillo", texto: "Rodilla sobre el tobillo" }, { id: "muslo-paralelo", texto: "Muslo paralelo al suelo" }],
+    },
+    tension: { articulacion: "kneeL", carga: "pelvis" },
+    movimiento: { fuente: "manual", modelo: "sentadilla-pared", vista: { az: 68, el: 8, radius: 0.85, target: [0, 0.62, 0.05] }, accesorios: ["wall"], trayectoria: null } }),
   ex({ id: "step-up", nombre: "Subidas al banco", equipo: ["banco"], musculo: "cuadriceps", secundarios: ["gluteos"], patron: "zancada", nivel: 1, unilateral: true,
     tecnica: ["Pie completo sobre el banco", "Sube empujando con la pierna de arriba; cambia a la mitad"],
     respiracion: "Exhala al subir, inhala al bajar", error: "Impulsarse con la pierna de abajo" }),
@@ -383,9 +433,17 @@ export const EXERCISES = [
     respiracion: "Exhala al subir, inhala al bajar", error: "Doblar las rodillas para impulsarse" }),
 
   // ───────────── Core ─────────────
-  ex({ id: "plancha", medida: "tiempo", nombre: "Plancha", musculo: "core", patron: "anti-extension", nivel: 1,
+  ex({ id: "plancha", medida: "tiempo", nombre: "Plancha", musculo: "core", secundarios: ["gluteos"], patron: "anti-extension", nivel: 1,
     tecnica: ["Antebrazos bajo los hombros", "Cuerpo recto, glúteos y abdomen apretados"],
-    respiracion: "Respira corto y constante, sin soltar el abdomen", error: "Cadera muy alta o hundida" }),
+    respiracion: "Respira corto y constante, sin soltar el abdomen", error: "Cadera muy alta o hundida",
+    tempo: [{ fase: "Sostén", desde: 0, hasta: 0, dur: 6, resp: "Respira corto y constante", esfuerzo: 0.85, cue: "Antebrazos bajo los hombros, glúteos y abdomen apretados" }],
+    control: {
+      angulo: { nombre: "Cadera", puntos: ["shoulderL", "hipL", "kneeL"], rango: [170, 180] },
+      fijas: [{ puntos: ["pelvis"], texto: "Cadera quieta: ni arriba ni hundida" }],
+      alineaciones: [{ id: "talones-hombros", texto: "Línea recta de talones a hombros" }],
+    },
+    tension: { articulacion: "hipL", carga: "chest" },
+    movimiento: { fuente: "manual", modelo: "plancha", vista: { az: 72, el: 12, radius: 0.92, target: [0, 0.2, 0.68] }, accesorios: ["mat"], trayectoria: null } }),
   ex({ id: "plancha-lateral", medida: "tiempo", nombre: "Plancha lateral", musculo: "core", patron: "anti-flexion-lateral", nivel: 1, unilateral: true,
     tecnica: ["Antebrazo bajo el hombro, pies apilados", "Cadera arriba en línea recta; cambia de lado a la mitad"],
     respiracion: "Respira constante", error: "Dejar caer la cadera" }),

@@ -1,7 +1,7 @@
 // Resumen al terminar: lo anotado durante la sesión (editable), esfuerzo, molestias, calificación y guardado.
 import { html, mount, fmtMin, toast, confirmInPage } from "./dom.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
-import { addSession, lastLogFor, saveRoutine, updateRoutine } from "../store.js";
+import { addSession, lastLogFor, saveRoutine, updateRoutine, newId } from "../store.js";
 import { markDone, summarize, PAUSE_OPTIONS } from "../engine/session-log.js";
 import { planLabel, emphasisLabel, placeLabel } from "./preview.js";
 
@@ -139,7 +139,7 @@ export function renderSummary(view, app) {
     if (t.dataset.action === "save") {
       const molestias = order.filter(r => form.molestia[r.id]).map(r => r.id);
       addSession({
-        id: `s-${Date.now().toString(36)}`,
+        id: newId("s"),
         fecha: new Date(stats.inicio).toISOString(),
         zonas: plan.zonas, prioridad: plan.prioridad, lugar: plan.lugar, preset: plan.preset, enfasis: plan.enfasis, expres: plan.expres,
         nombre: plan.nombre ?? planLabel(plan), rutinaId: plan.routineId ?? null, minutosPlan: plan.minutos, duracionSeg: durSec, completa: finished,
