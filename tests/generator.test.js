@@ -175,6 +175,12 @@ test("avisa las zonas que quedan sin ejercicios con el equipo elegido", () => {
   assert.deepEqual(r.sinEjercicios, ["brazos"]);
 });
 
+test("distingue las zonas que quedan fuera por tiempo de las que no tienen equipo", () => {
+  const r = generateRoutine({ minutos: 30, zonas: PRESETS.push.sel, lugar: "casa", preset: "casa", enfasis: "fuerza", seed: 3 }, settings);
+  assert.deepEqual(r.sinEjercicios, []);
+  for (const z of r.sinTiempo) assert.ok(!r.bloques.some(b => b.zona === z), z);
+});
+
 test("Fuerza planifica con la duración real de tus series", () => {
   const base = generateRoutine({ minutos: 45, zonas: PRESETS.push.sel, lugar: "gym", enfasis: "fuerza", seed: 4 }, settings);
   const slow = generateRoutine({ minutos: 45, zonas: PRESETS.push.sel, lugar: "gym", enfasis: "fuerza", seed: 4, tiempoSerie: { global: 70 } }, settings);

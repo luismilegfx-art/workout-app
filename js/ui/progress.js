@@ -104,7 +104,7 @@ export function renderProgress(view, app) {
 
     <section class="card">
       <div class="spread">
-        <h3 style="text-transform:capitalize">${monthName}</h3>
+        <h3>${monthName}</h3>
         <div class="row"><button class="btn small" data-act="prev-month" aria-label="Mes anterior">‹</button><button class="btn small" data-act="next-month" aria-label="Mes siguiente">›</button></div>
       </div>
       <div class="cal">

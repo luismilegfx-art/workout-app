@@ -73,6 +73,7 @@ export function renderPreview(view, app) {
         <div class="stat"><div class="v">${plan.bloques.length}</div><div class="k">${plan.bloques.length === 1 ? "Bloque" : "Bloques"}</div></div>
       </div>`}
       ${plan.sinEjercicios?.length ? html`<span class="warn-note">Con el equipo escogido no hay ejercicios para ${plan.sinEjercicios.map(z => ZONES[z].nombre).join(", ")}. Agrega equipo en el paso Lugar o quita esa zona.</span>` : ""}
+      ${plan.sinTiempo?.length ? html`<span class="warn-note">En ${plan.minutos} min no cabe ${plan.sinTiempo.map(z => ZONES[z].nombre).join(", ")}${plan.modo === "series" ? " con descansos de Fuerza" : ""}. Sube el tiempo${plan.modo === "series" ? " o usa el énfasis Músculo" : ""} si quieres incluirlo.</span>` : ""}
       ${plan.prioridad?.length ? html`<span class="muted">Prioridad: ${plan.prioridad.map(k => { const [z, s] = k.split("."); return `${ZONES[z].nombre} ${ZONES[z].subs[s].toLowerCase()}`; }).join(", ")}</span>` : ""}
     </section>
 

@@ -251,7 +251,7 @@ export function generateRoutine(req, settings, history = []) {
 
   const musculos = [...new Set(bloques.flatMap(b => b.ejercicios.map(id => EXERCISE_BY_ID[id].musculo)))];
   const zona = bodyZone(units);
-  const sinEjercicios = expres ? [] : missingZones(req, bloques);   // exprés usa una sola zona a propósito
+  const { sinEjercicios, sinTiempo } = expres ? { sinEjercicios: [], sinTiempo: [] } : missingZones(req, bloques, pool);   // exprés usa una sola zona a propósito
   const plan = {
     id: `r-${Date.now().toString(36)}-${seed.toString(36)}`,
     seed, creada: new Date().toISOString(),
@@ -262,7 +262,7 @@ export function generateRoutine(req, settings, history = []) {
     formato: { trabajo: f.trabajo, descanso: f.descanso, descansoRonda: f.descansoRonda },
     calentamiento: pickAuxiliary("calentamiento", zona, warm.n, ctx, rng, musculos),
     estiramiento: pickAuxiliary("estiramiento", zona, cool.n, ctx, rng, musculos),
-    bloques, sinEjercicios,
+    bloques, sinEjercicios, sinTiempo,
   };
 
   // 7. Ajuste final al tiempo total, con transiciones y unilaterales (doble tiempo) ya incluidos.
@@ -306,11 +306,16 @@ export function generateRoutine(req, settings, history = []) {
 }
 
 
-// Zonas escogidas que no quedaron en la rutina (por ejemplo, sin ejercicios con el equipo elegido)
-function missingZones(req, bloques) {
-  const asked = Object.keys(normalizeTargets(req).reduce((o, u) => (o[u.zona] = 1, o), {}));
+// Zonas escogidas que no quedaron en la rutina, separadas por motivo:
+// sin ejercicios con el equipo disponible, o sin espacio en el tiempo escogido.
+function missingZones(req, bloques, pool) {
+  const targets = normalizeTargets(req);
+  const asked = [...new Set(targets.map(u => u.zona))];
   const got = new Set(bloques.flatMap(b => b.ejercicios.map(id => EXERCISE_BY_ID[id].sub.split(".")[0])));
-  return asked.filter(z => !got.has(z));
+  const missing = asked.filter(z => !got.has(z));
+  const subsOf = z => targets.filter(u => u.zona === z).flatMap(u => u.subs.map(s => `${z}.${s}`));
+  const hasEx = z => pool.some(e => subsOf(z).includes(e.sub));
+  return { sinEjercicios: missing.filter(z => !hasEx(z)), sinTiempo: missing.filter(hasEx) };
 }
 
 // ───────── Fuerza: series por repeticiones ─────────
@@ -365,7 +370,7 @@ function strengthPlan({ req, settings, history, rng, seed, units, equip, pool, c
     tiempoSerie: tiempos,
     calentamiento: pickAuxiliary("calentamiento", zona, warm.n, ctx, rng, musculos),
     estiramiento: pickAuxiliary("estiramiento", zona, cool.n, ctx, rng, musculos),
-    bloques, sinEjercicios: missingZones(req, bloques),
+    bloques, ...missingZones(req, bloques, pool),
   };
 
   // Ajuste al tiempo: series por ejercicio y segundos de descanso
