@@ -13,7 +13,7 @@ export function applyTheme() {
 }
 applyTheme();
 
-const FORMAT_LABELS = { fuerza: "Fuerza", masa: "Masa", condicion: "Condición", expres: "Exprés" };
+const FORMAT_LABELS = { fuerza: "Fuerza", masa: "Músculo", condicion: "Resistencia", expres: "Exprés" };
 
 export function renderProfile(view, app) {
   const s = app.settings, p = s.params;
@@ -26,6 +26,10 @@ export function renderProfile(view, app) {
     <label class="label" for="f-${key}">${label}</label>
     <div class="row" style="flex-wrap:nowrap"><input class="input" type="number" id="f-${key}" data-fparam="${key}" value="${value}" ${attrs}><span class="muted">${suffix}</span></div></div>`;
   const F = p.fuerza;
+  const G = p.progresion;
+  const gnum = (key, label, value, suffix, attrs = "") => html`<div class="field">
+    <label class="label" for="g-${key}">${label}</label>
+    <div class="row" style="flex-wrap:nowrap"><input class="input" type="number" id="g-${key}" data-gparam="${key}" value="${value}" ${attrs}><span class="muted">${suffix}</span></div></div>`;
 
   mount(view, html`
     <div class="spread"><h1>Perfil</h1></div>
@@ -110,6 +114,22 @@ export function renderProfile(view, app) {
         ${fnum("serieEstimada", "Duración estimada por serie", F.serieEstimada, "s", 'min="15" max="120" step="5"')}
       </div>
       <label class="check"><input type="checkbox" id="opt-aprox" ${F.aproximacion ? "checked" : ""}> Series de aproximación antes de los ejercicios principales con carga</label>
+      <span class="label">Progresión</span>
+      <div class="params">
+        ${gnum("incrementoSuperior", "Paso de peso: tren superior", G.incrementoSuperior, "lb", 'min="1" max="20"')}
+        ${gnum("incrementoInferior", "Paso de peso: piernas", G.incrementoInferior, "lb", 'min="1" max="40"')}
+        ${gnum("sesionesParaSubir", "Sesiones para subir", G.sesionesParaSubir, "", 'min="1" max="5"')}
+        ${gnum("rirParaSubir", "Reserva para subir", G.rirParaSubir, "reps", 'min="0" max="5"')}
+        ${gnum("sesionesParaBajar", "Sesiones para bajar", G.sesionesParaBajar, "", 'min="2" max="6"')}
+        ${gnum("diasPausa", "Pausa: a partir de", G.diasPausa, "días", 'min="3" max="60"')}
+        ${gnum("recortePausa", "Pausa: menos carga", G.recortePausa, "%", 'min="0" max="50"')}
+        ${gnum("diasPausaLarga", "Pausa larga: a partir de", G.diasPausaLarga, "días", 'min="7" max="120"')}
+        ${gnum("recortePausaLarga", "Pausa larga: menos carga", G.recortePausaLarga, "%", 'min="0" max="60"')}
+        ${gnum("objetivos.masa.0", "Músculo: reps mínimo", G.objetivos.masa[0], "", 'min="1" max="30"')}
+        ${gnum("objetivos.masa.1", "Músculo: reps máximo", G.objetivos.masa[1], "", 'min="1" max="30"')}
+        ${gnum("objetivos.condicion.0", "Resistencia: reps mínimo", G.objetivos.condicion[0], "", 'min="1" max="50"')}
+        ${gnum("objetivos.condicion.1", "Resistencia: reps máximo", G.objetivos.condicion[1], "", 'min="1" max="50"')}
+      </div>
     </section>
 
     <section class="card">
@@ -180,6 +200,14 @@ export function renderProfile(view, app) {
       if (idx === undefined) fuerza[k] = value; else fuerza[k][Number(idx)] = value;
       if (Array.isArray(fuerza[k]) && fuerza[k][0] > fuerza[k][1]) { toast("El mínimo no puede ser mayor que el máximo"); return renderProfile(view, app); }
       app.updateSettings({ params: { ...p, fuerza } }); return toast("Guardado");
+    }
+    if (t.dataset.gparam) {
+      const value = Number(t.value); if (!Number.isFinite(value) || value < 0) return;
+      const progresion = structuredClone(G); const path = t.dataset.gparam.split(".");
+      let o = progresion; for (const k of path.slice(0, -1)) o = o[k];
+      o[path.at(-1)] = value;
+      if (Array.isArray(o) && o[0] > o[1]) { toast("El mínimo no puede ser mayor que el máximo"); return renderProfile(view, app); }
+      app.updateSettings({ params: { ...p, progresion } }); return toast("Guardado");
     }
     if (t.dataset.param) {
       const value = Number(t.value); if (!Number.isFinite(value)) return;

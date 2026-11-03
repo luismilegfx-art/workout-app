@@ -5,6 +5,7 @@ import { EXERCISE_BY_ID } from "../data/exercises.js";
 import { generateRoutine, swapExercise, buildSteps, blockTitle, sumSteps } from "../engine/generator.js";
 import { techCard } from "./technique.js";
 import { lastLogFor, saveRoutine, setTimeStats } from "../store.js";
+import { suggest } from "../engine/progression.js";
 
 const open = new Set();
 
@@ -30,6 +31,14 @@ export function renderPreview(view, app) {
     return `${b.rondas} series × ${what} · descanso ${fmtClock(b.descansoSerie)}${b.aproximacion ? ` · ${b.aproxCorta ? "1 serie" : "2 series"} de aproximación` : ""}`;
   };
 
+  // Lo que toca según el historial: peso sugerido, subida, retomar o cambio de variante
+  const SUG_LABEL = { subir: "Sube a", bajar: "Baja a", retomar: "Retoma con", mantener: "", nuevo: "" };
+  const sugTag = id => {
+    const sg = suggest(id, app.history, app.settings.params);
+    if (sg.estado === "variante") return html`<span class="sug">${sg.motivo}</span>`;
+    if (sg.peso == null) return sg.estado === "nuevo" && EXERCISE_BY_ID[id].carga ? html`<span class="ex-meta">Primera vez: se calibra el peso serie a serie</span>` : "";
+    return html`<span class="${sg.estado === "mantener" ? "ex-meta" : "sug"}">${SUG_LABEL[sg.estado] ? `${SUG_LABEL[sg.estado]} ${sg.peso} lb` : `${sg.peso} lb`}</span>`;
+  };
   const item = (id, meta, swappable) => {
     const e = EXERCISE_BY_ID[id];
     const isOpen = open.has(id);
@@ -38,6 +47,7 @@ export function renderPreview(view, app) {
         <div class="stack" style="gap:2px;min-width:0">
           <button class="ex-name" data-action="toggle" data-id="${id}" aria-expanded="${isOpen}">${e.nombre}</button>
           <span class="ex-meta">${meta}</span>
+          ${swappable ? sugTag(id) : ""}
         </div>
         ${swappable ? html`<button class="btn small ghost" data-action="swap" data-id="${id}" aria-label="Cambiar ${e.nombre}">Cambiar</button>` : ""}
       </div>

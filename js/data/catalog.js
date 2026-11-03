@@ -87,6 +87,15 @@ export const DEFAULT_SETTINGS = {
       aproximacion: true, aproximaciones: [[50, 8], [75, 3]], descansoAproximacion: 60,
       margenAjuste: 120,   // segundos por encima de lo planificado antes de proponer quitar una serie
     },
+    // Progresión (reglas en la especificación técnica): pasos de peso, sesiones para subir o bajar, inactividad
+    progresion: {
+      incrementoSuperior: 5, incrementoInferior: 10,   // lb por paso
+      sesionesParaSubir: 2, rirParaSubir: 2,           // sesiones seguidas superando el rango con esa reserva
+      sesionesParaBajar: 3,                            // sesiones seguidas sin llegar al mínimo
+      diasPausa: 14, recortePausa: 10,                 // días sin el ejercicio → % menos de carga
+      diasPausaLarga: 28, recortePausaLarga: 20,
+      objetivos: { masa: [8, 12], condicion: [12, 20], expres: [10, 20] },   // repeticiones objetivo por énfasis (Fuerza usa las suyas)
+    },
     formatos: {
       masa:      { trabajo: [40, 50], descanso: [15, 30], descansoRonda: 60, rondas: [2, 3], porBloque: [3, 4] },
       condicion: { trabajo: [30, 40], descanso: [0, 15],  descansoRonda: 40, rondas: [1, 3], porBloque: [3, 4] },

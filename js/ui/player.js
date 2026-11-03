@@ -6,9 +6,10 @@ import { EQUIPMENT } from "../data/catalog.js";
 import { SessionRunner } from "../engine/runner.js";
 import { say, beep, unlockAudio, stopSpeech } from "../engine/voice.js";
 import { swapExercise, buildSteps, sumSteps } from "../engine/generator.js";
-import { createLog, markDone, canLogIn, settle, update, PAUSE_OPTIONS, DEFAULT_REPS } from "../engine/session-log.js";
+import { createLog, markDone, canLogIn, settle, update, PAUSE_OPTIONS, DEFAULT_REPS, plannedWeight } from "../engine/session-log.js";
 import { techCard } from "./technique.js";
 import { lastLogFor } from "../store.js";
+import { suggest } from "../engine/progression.js";
 import { keepAwake, releaseAwake } from "../engine/keep-awake.js";
 
 const STATE = { preparacion: "prep", calentamiento: "aux", estiramiento: "aux", trabajo: "work" };
@@ -52,9 +53,12 @@ export function openPlayer(app) {
   let shown = [];          // intervalos que se están anotando en este descanso
   let started = false, lastIndex = 0;
 
+  // Sugerencia de progresión por ejercicio (una vez por sesión, con el historial al empezar)
+  const sugs = {};
+  const sugFor = id => (sugs[id] ??= suggest(id, app.history, app.settings.params));
   const markWork = i => {
     const s = plan.steps[i];
-    if (s?.tipo === "trabajo") markDone(log, s, lastLogFor(s.ejercicio));
+    if (s?.tipo === "trabajo") markDone(log, s, lastLogFor(s.ejercicio), sugFor(s.ejercicio));
   };
 
   const runner = new SessionRunner(plan.steps, {
@@ -173,6 +177,10 @@ export function openPlayer(app) {
                 html`<button class="chip" data-log="pausas" data-i="${i}" data-v="${o.v}" aria-pressed="${x.pausas === o.v}">${o.label}</button>`)}</div>`
             : stepperHTML(i, "reps", x.reps, "reps", `repeticiones de ${e.nombre}`)}
           ${e.carga ? stepperHTML(i, "peso", x.peso, "lb", `peso de ${e.nombre}`) : ""}
+          ${e.carga && x.medida === "reps" ? html`<div class="rirp" role="group" aria-label="Repeticiones que te sobraban en ${e.nombre}">
+            <span class="muted">¿Cuántas más podías?</span>
+            ${["0", "1", "2", "3", "4+"].map(v => html`<button class="chip" data-log="rir" data-i="${i}" data-v="${v}" aria-pressed="${String(x.rir) === v}">${v}</button>`)}
+          </div>` : ""}
         </div>`;
       })}
     </div>`;
@@ -203,9 +211,13 @@ export function openPlayer(app) {
     const open = !!s.abierto;
     const nextWork = plan.steps.slice(runner.index + 1).find(x => WORKISH.includes(x.tipo));
     const last = ex?.carga ? lastLogFor(ex.id) : null;
+    const sug = ex?.carga && isWork ? sugFor(ex.id) : null;
+    const workW = sug?.peso ?? last?.peso ?? null;
+    const pw = s.tipo === "trabajo" && ex?.carga ? plannedWeight(log, s, last, sug) : null;
     const weightNote = !ex?.carga || !isWork ? ""
-      : s.tipo === "aproximacion" ? (last?.peso ? `≈ ${round5(last.peso * s.pct / 100)} lb · ${s.pct}% del peso de trabajo` : `Ligero: ${s.pct}% de tu peso de trabajo`)
-      : s.serie && last?.peso ? `Peso de referencia: ${last.peso} lb` : "";
+      : s.tipo === "aproximacion" ? (workW ? `≈ ${round5(workW * s.pct / 100)} lb · ${s.pct}% del peso de trabajo` : `Ligero: ${s.pct}% de tu peso de trabajo`)
+      : pw?.peso != null ? `${pw.peso} lb${pw.motivo ? ` · ${pw.motivo}` : ""}`
+      : pw?.motivo ?? "";
     const phase = s.tipo === "aproximacion" ? `${s.fase} · Aproximación ${s.paso}/${s.pasos}`
       : s.serie ? `${s.fase} · Serie ${s.ronda + 1}/${s.rondas}`
       : s.tipo === "trabajo" ? `${s.fase} · Ronda ${s.ronda + 1}/${s.rondas}`
@@ -298,6 +310,12 @@ export function openPlayer(app) {
   root.addEventListener("click", async e => {
     const lg = e.target.closest("[data-log]");
     if (lg) {
+      if (lg.dataset.log === "rir") {
+        const i = Number(lg.dataset.i), v = lg.dataset.v;
+        update(log, i, { rir: log.entries[i].rir === v ? null : v });
+        lg.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === log.entries[i].rir)));
+        return;
+      }
       if (lg.dataset.log === "pausas") {
         const i = Number(lg.dataset.i);
         update(log, i, { pausas: Number(lg.dataset.v) });

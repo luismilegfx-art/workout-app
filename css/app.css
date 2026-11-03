@@ -327,3 +327,8 @@ table.fmt input { width: 64px; }
 @media (max-width: 480px) { .p-done { min-width: 0 !important; flex: 1; } }
 .adj { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: .95rem; }
 .warn-note { color: var(--warn); font-size: .92rem; }
+.rirp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; }
+.rirp .muted { font-size: .85rem; margin-right: 4px; }
+.rirp .chip { min-width: 44px; padding: 8px 10px; text-align: center; }
+.rirp .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.sug { font-size: .8rem; font-weight: 700; color: var(--accent); }
