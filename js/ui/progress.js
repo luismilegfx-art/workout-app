@@ -4,8 +4,38 @@ import { html, mount, fmtMin, fmtDate, confirmInPage } from "./dom.js";
 import { ZONES, EMPHASES, FOCUSES } from "../data/catalog.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
 import { deleteSession } from "../store.js";
+import { recommendToday } from "../engine/recommend.js";
+import { newRequest } from "./train.js";
+import { PRESETS } from "../data/catalog.js";
 
 const DAYS = ["L", "M", "M", "J", "V", "S", "D"];
+
+// Qué toca hoy: recomendación con su motivo y un toque para empezar
+function todayCard(rec, app) {
+  const minH = app.settings.params.recuperacionHoras ?? 48;
+  const zonasRec = Object.entries(ZONES).map(([z, def]) => {
+    const hs = Object.keys(def.subs).map(s => rec.recuperacion[`${z}.${s}`]);
+    const ready = hs.filter(v => v == null || v >= minH).length;
+    const worked = hs.filter(v => v != null);
+    const h = worked.length ? Math.min(...worked) : null;
+    return { nombre: def.nombre, h, listo: ready === hs.length, parcial: ready > 0 && ready < hs.length };
+  });
+  const enf = rec.enfasis && EMPHASES[rec.enfasis] ? EMPHASES[rec.enfasis].nombre : "";
+  return html`<section class="card today">
+    <span class="label">Qué toca hoy</span>
+    <div class="spread" style="align-items:flex-end">
+      <h2 class="today-title">${rec.estado === "descanso" ? "Descanso" : rec.nombre}${rec.estado === "entrenar" && enf ? html` <span class="today-enf">· ${enf}</span>` : ""}</h2>
+    </div>
+    <span class="muted">${rec.motivo}</span>
+    <div class="recov" aria-label="Recuperación por zona">${zonasRec.map(z => html`<span class="recov-z ${z.listo ? "on" : z.parcial ? "half" : ""}" title="${z.h == null ? "Sin trabajar todavía" : `Última vez hace ${Math.round(z.h)} h`}">${z.nombre}<small>${z.listo ? "lista" : z.parcial ? "en parte" : `lista en ${Math.max(1, Math.round(minH - z.h))} h`}</small></span>`)}</div>
+    <div class="row">
+      ${rec.estado === "entrenar"
+        ? html`<button class="btn primary" data-act="rec" data-preset="${rec.preset}" data-enfasis="${rec.enfasis}">Empezar ${rec.nombre}</button>`
+        : html`<button class="btn" data-act="train">Entrenar de todas formas</button>`}
+      ${rec.alternativa ? html`<button class="btn ghost" data-act="rec" data-preset="${rec.alternativa.preset}" data-enfasis="${rec.enfasis}">Otra opción: ${rec.alternativa.nombre}</button>` : ""}
+    </div>
+  </section>`;
+}
 const ui = { month: null, day: null, open: new Set() };
 
 const dayKey = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -60,6 +90,7 @@ export function renderProgress(view, app) {
       <button class="btn small ghost" data-act="toggle" data-id="${s.id}" aria-expanded="${ui.open.has(s.id)}">${ui.open.has(s.id) ? "Ocultar" : "Ver"}</button>
     </div>`;
 
+  const rec = recommendToday(h, app.settings);
   mount(view, html`
     <div class="hello">
       <div class="stack" style="gap:4px">
@@ -68,11 +99,7 @@ export function renderProgress(view, app) {
       </div>
     </div>
 
-    ${h.length ? "" : html`<section class="card">
-      <h3>Empieza tu primer entrenamiento</h3>
-      <span class="muted">Cuando registres sesiones, aquí verás tu semana, tu constancia y tu progreso.</span>
-      <div><button class="btn primary" data-act="train">Entrenar</button></div>
-    </section>`}
+    ${todayCard(rec, app)}
 
     <section class="card">
       <div class="spread"><h3>Esta semana</h3><span class="muted">Meta: ${goal} sesiones</span></div>
@@ -127,6 +154,12 @@ export function renderProgress(view, app) {
     const id = t.dataset.id;
     switch (t.dataset.act) {
       case "train": return app.newTraining();
+      case "rec": {
+        // Abre Entrenar con la zona y el énfasis recomendados ya escogidos; lugar y tiempo los decides tú
+        const preset = t.dataset.preset, r = newRequest(app);
+        Object.assign(r, { zonas: structuredClone(PRESETS[preset].sel), enfasis: t.dataset.enfasis || null, step: "lugar" });
+        app.request = r; app.plan = null; return app.go("entrenar");
+      }
       case "toggle": ui.open.has(id) ? ui.open.delete(id) : ui.open.add(id); break;
       case "day": ui.day = ui.day === t.dataset.k ? null : t.dataset.k; break;
       case "prev-month": ui.month = new Date(m.getFullYear(), m.getMonth() - 1, 1); ui.day = null; break;

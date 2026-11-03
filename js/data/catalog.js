@@ -79,6 +79,7 @@ export const DEFAULT_SETTINGS = {
     calentamientoMaxEjercicios: 8, estiramientoMaxEjercicios: 7,   // ejercicios distintos como máximo, sin repetir
     margenTiempo: 5,       // ± % aceptado sobre el tiempo total
     maxEquipos: 3,         // equipos distintos por sesión (el peso corporal no cuenta)
+    recuperacionHoras: 48,  // horas antes de volver a cargar la misma subzona (recomendación de qué toca hoy)
     registroMinDescanso: 15, // segundos: descansos más cortos acumulan el registro hasta uno más largo
     // Fuerza: series por repeticiones; el tiempo de cada serie es una estimación para planificar
     fuerza: {

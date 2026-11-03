@@ -332,3 +332,13 @@ table.fmt input { width: 64px; }
 .rirp .chip { min-width: 44px; padding: 8px 10px; text-align: center; }
 .rirp .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .sug { font-size: .8rem; font-weight: 700; color: var(--accent); }
+/* ───── qué toca hoy ───── */
+.today { border-color: var(--accent); }
+.today-title { font-size: clamp(2rem, 6vw, 2.8rem); line-height: .95; }
+.today-enf { color: var(--accent); }
+.recov { display: flex; flex-wrap: wrap; gap: 6px; }
+.recov-z { display: inline-flex; flex-direction: column; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: .82rem; font-weight: 600; min-width: 84px; }
+.recov-z small { font-size: .72rem; font-weight: 500; }
+.recov-z.on { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--fg); }
+.recov-z.on small { color: var(--ok); }
+.recov-z.half { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
