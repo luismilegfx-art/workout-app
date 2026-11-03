@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Entrenador con cámara</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+:root {
+  --bg: #f2f0eb; --surface: #ffffff; --surface-2: #e8e5de; --line: #d5d0c6;
+  --fg: #16161a; --muted: #5f5b55; --accent: #c8440f; --accent-fg: #ffffff; --hold: #2e4a5f; --ok: #1f7a4d; --warn: #9b1c1c;
+  --display: "Archivo", "Arial Narrow", Impact, sans-serif; --body: "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111113; --surface: #1a1a1d; --surface-2: #232327; --line: #34343a;
+  --fg: #f2f0eb; --muted: #a3a09a; --accent: #ff6a2b; --accent-fg: #16161a; --hold: #8db3cf; --ok: #5cc08a; --warn: #f07171; color-scheme: dark; } }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+h1 { font-family: var(--display); font-stretch: 75%; font-weight: 800; text-transform: uppercase; font-size: clamp(1.8rem, 5vw, 2.6rem); line-height: .95; margin: 0; }
+.label { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: .92rem; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.stage { position: relative; background: #000; border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 9; }
+@media (max-width: 600px) { .stage { aspect-ratio: 3 / 4; } }
+.stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.stage.mirror video, .stage.mirror canvas { transform: scaleX(-1); }
+.hud { position: absolute; left: 0; right: 0; top: 0; padding: 14px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none;
+  background: linear-gradient(rgb(0 0 0 / .55), transparent); color: #fff; }
+.count { font-family: var(--display); font-stretch: 75%; font-weight: 800; font-size: clamp(4.5rem, 14vw, 9rem); line-height: .8; font-variant-numeric: tabular-nums; }
+.count small { font-size: .3em; letter-spacing: .1em; margin-left: 6px; opacity: .8; }
+.state { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .85rem; padding: 4px 10px; border-radius: 4px; background: var(--accent); color: var(--accent-fg); }
+.state.wait { background: rgb(255 255 255 / .2); color: #fff; }
+.state.bad { background: var(--warn); color: #fff; }
+.msg { position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgb(0 0 0 / .62); color: #fff; border-radius: 10px; padding: 12px 14px;
+  font-size: clamp(1.05rem, 3.2vw, 1.5rem); font-weight: 700; line-height: 1.25; border-left: 4px solid var(--accent); }
+.msg.warn { border-left-color: var(--warn); }
+.angle { position: absolute; right: 16px; bottom: 84px; background: rgb(0 0 0 / .62); color: #fff; border-radius: 10px; padding: 8px 12px; min-width: 180px; }
+.angle b { font-family: var(--display); font-stretch: 75%; font-size: 1.8rem; font-variant-numeric: tabular-nums; }
+.bar { position: relative; height: 6px; background: rgb(255 255 255 / .25); border-radius: 3px; margin-top: 6px; }
+.bar i { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 3px; }
+.bar u { position: absolute; top: -4px; width: 3px; height: 14px; background: #fff; border-radius: 2px; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: #fff; background: rgb(0 0 0 / .6); }
+.overlay p { max-width: 420px; margin: 0 0 16px; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 18px; border-radius: 8px; font-weight: 600; min-height: 44px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-family: var(--display); font-stretch: 75%; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; font-size: 1.25rem; padding: 12px 26px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.card ul { margin: 0; padding-left: 18px; }
+.muted { color: var(--muted); }
+.main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="main">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><span class="label">Prueba · Entrenador con cámara</span><h1 id="title">Sentadilla con barra</h1></div>
+      <a class="muted" href="../">Volver a la app</a>
+    </div>
+    <div class="chips" id="exList" role="group" aria-label="Ejercicio"></div>
+    <div class="stage mirror" id="stage">
+      <video id="video" playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="hud">
+        <div><div class="count" id="count">0</div></div>
+        <span class="state wait" id="state">Esperando</span>
+      </div>
+      <div class="angle" id="angleBox" hidden><span id="angleName">Rodilla</span> <b id="angleVal">—</b><span class="muted" id="angleRange"></span><div class="bar" id="bar"><i id="barRange"></i><u id="barNow"></u></div></div>
+      <div class="msg" id="msg">Colócate de lado, con el cuerpo completo en la imagen</div>
+      <div class="overlay" id="overlay"><div><p id="overlayText">Pon el teléfono o la computadora de lado a ti, a 2–3 metros, con el cuerpo completo en la imagen.</p><button class="btn primary" id="startBtn">Encender cámara</button></div></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="resetBtn">Reiniciar conteo</button>
+      <button class="btn" id="voiceBtn" aria-pressed="true">Voz: sí</button>
+      <button class="btn" id="camBtn">Cambiar cámara</button>
+      <span class="muted" id="status">Cargando el detector…</span>
+    </div>
+  </div>
+  <aside class="stack" style="display:flex;flex-direction:column;gap:12px">
+    <div class="card"><span class="label">Técnica</span><ul id="tech"></ul><span id="resp"></span></div>
+    <div class="card"><span class="label">Lo que revisa la cámara</span><ul id="checks"></ul></div>
+    <div class="card"><span class="label">Cómo usarla</span>
+      <span class="muted">De lado es lo ideal; en diagonal también funciona. Quédate quieto un segundo en la posición inicial y empieza. Cuenta la repetición al volver a la posición inicial.</span></div>
+  </aside>
+</div>
+
+<script type="module">
+const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+import { EXERCISES } from "../js/data/exercises.js";
+import { PUNTOS } from "../js/data/exercise-schema.js";
+import { createCoach } from "../js/engine/coach.js";
+
+const $ = id => document.getElementById(id);
+const video = $("video"), canvas = $("canvas"), g = canvas.getContext("2d");
+const LIST = EXERCISES.filter(e => e.control?.angulo);
+let ficha = LIST.find(e => e.id === new URLSearchParams(location.search).get("ex")) ?? LIST[0];
+let coach = createCoach(ficha), landmarker = null, running = false, voice = true, facing = "user", stream = null;
+
+const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function renderExercise() {
+  $("title").textContent = ficha.nombre;
+  $("exList").innerHTML = LIST.map(e => `<button class="chip" data-id="${e.id}" aria-pressed="${e.id === ficha.id}">${e.nombre}</button>`).join("");
+  $("tech").innerHTML = ficha.tecnica.map(t => `<li>${t}</li>`).join("");
+  $("resp").innerHTML = `<b>Respiración:</b> ${ficha.respiracion}`;
+  const a = ficha.control.angulo, iso = ficha.medida === "tiempo";
+  $("checks").innerHTML = [
+    iso ? `Tiempo sostenido con ${a.nombre.toLowerCase()} entre ${a.rango[0]}° y ${a.rango[1]}°` : `Repeticiones completas: ${a.nombre.toLowerCase()} de ${a.rango[1]}° a ${a.rango[0]}°`,
+    ...ficha.control.fijas.map(f => f.texto),
+    ...(iso ? [] : ["Ritmo: avisa si vas mucho más rápido que el tempo"]),
+  ].map(t => `<li>${t}</li>`).join("");
+  $("count").innerHTML = iso ? `0<small>s</small>` : "0";
+  $("angleName").textContent = a.nombre; $("angleRange").textContent = ` · ${a.rango[0]}–${a.rango[1]}°`;
+  $("barRange").style.left = `${a.rango[0] / 180 * 100}%`; $("barRange").style.width = `${(a.rango[1] - a.rango[0]) / 180 * 100}%`;
+  setState("esperando"); setMsg(iso ? "Ponte en posición y quédate quieto un segundo" : "Quédate quieto en la posición inicial", false);
+}
+function setState(estado) {
+  const el = $("state");
+  el.textContent = { esperando: "Esperando", listo: "Listo", moviendo: "En movimiento", sosteniendo: "Sosteniendo", fuera: "Fuera de posición", perdido: "No te veo" }[estado] ?? estado;
+  el.className = "state " + (["esperando"].includes(estado) ? "wait" : ["fuera", "perdido"].includes(estado) ? "bad" : "");
+}
+function setMsg(text, warn) { const m = $("msg"); m.textContent = text; m.className = "msg" + (warn ? " warn" : ""); }
+
+let lastSaid = "", lastSaidAt = 0;
+function say(text) {
+  if (!voice || !("speechSynthesis" in window)) return;
+  const now = performance.now();
+  if (text === lastSaid && now - lastSaidAt < 3000) return;
+  lastSaid = text; lastSaidAt = now;
+  const u = new SpeechSynthesisUtterance(text); u.lang = "es-ES"; u.rate = 1.05;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+function pt(lm, name) {
+  const i = PUNTOS[name];
+  if (!Array.isArray(i)) return lm[i];
+  return { x: (lm[i[0]].x + lm[i[1]].x) / 2, y: (lm[i[0]].y + lm[i[1]].y) / 2 };
+}
+const mirrorName = n => n.replace(/L$/, "§").replace(/R$/, "L").replace(/§$/, "R");
+function draw(lm, side) {
+  const w = canvas.width, h = canvas.height;
+  g.clearRect(0, 0, w, h);
+  g.lineCap = "round"; g.lineWidth = Math.max(3, w / 220); g.strokeStyle = "rgba(255,255,255,.75)";
+  for (const [a, b] of BONES) {
+    if ((lm[a].visibility ?? 1) < .4 || (lm[b].visibility ?? 1) < .4) continue;
+    g.beginPath(); g.moveTo(lm[a].x * w, lm[a].y * h); g.lineTo(lm[b].x * w, lm[b].y * h); g.stroke();
+  }
+  // Ángulo medido: en el color de acento
+  const names = ficha.control.angulo.puntos.map(n => side === "R" ? mirrorName(n) : n);
+  const [p0, p1, p2] = names.map(n => pt(lm, n));
+  g.strokeStyle = css("--accent") || "#ff6a2b"; g.lineWidth = Math.max(6, w / 120);
+  g.beginPath(); g.moveTo(p0.x * w, p0.y * h); g.lineTo(p1.x * w, p1.y * h); g.lineTo(p2.x * w, p2.y * h); g.stroke();
+  g.fillStyle = "#fff"; g.beginPath(); g.arc(p1.x * w, p1.y * h, Math.max(7, w / 110), 0, Math.PI * 2); g.fill();
+  // Puntos que no deben moverse: anillo frío, discreto
+  g.strokeStyle = css("--hold") || "#8db3cf"; g.lineWidth = Math.max(2, w / 300);
+  for (const f of ficha.control.fijas) for (const n0 of f.puntos) {
+    const p = pt(lm, side === "R" ? mirrorName(n0) : n0); if (!p) continue;
+    g.beginPath(); g.arc(p.x * w, p.y * h, Math.max(10, w / 70), 0, Math.PI * 2); g.stroke();
+  }
+}
+
+let lastT = -1;
+function loop() {
+  if (!running) return;
+  if (video.readyState >= 2 && video.currentTime !== lastT) {
+    lastT = video.currentTime;
+    if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+    const now = performance.now();
+    const res = landmarker.detectForVideo(video, now);
+    const lm = res.landmarks?.[0];
+    const st = coach.update(lm ? { lm, world: res.worldLandmarks?.[0] } : { lm: Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 0 })) }, now);
+    if (lm) {
+      const visL = ["hipL", "kneeL", "shoulderL"].reduce((t, n) => t + (pt(lm, n).visibility ?? 0), 0), visR = ["hipR", "kneeR", "shoulderR"].reduce((t, n) => t + (pt(lm, n).visibility ?? 0), 0);
+      draw(lm, visR > visL ? "R" : "L");
+    } else g.clearRect(0, 0, canvas.width, canvas.height);
+    const iso = ficha.medida === "tiempo";
+    $("count").innerHTML = iso ? `${Math.floor(st.segundos)}<small>s</small>` : String(st.reps);
+    setState(st.estado);
+    if (st.angulo != null) {
+      $("angleBox").hidden = false; $("angleVal").textContent = `${Math.round(st.angulo)}°`;
+      $("barNow").style.left = `calc(${Math.min(180, st.angulo) / 180 * 100}% - 1px)`;
+    }
+    for (const e of st.eventos) {
+      setMsg(e.texto, e.tipo === "aviso" || (e.tipo === "rep" && (!e.completa || e.rapida)));
+      say(e.tipo === "rep" ? e.texto.replace(/^(\d+)\.\s*/, "$1. ") : e.texto);
+    }
+    if (!st.eventos.length && (st.estado === "esperando")) setMsg(st.mensaje, false);
+  }
+  requestAnimationFrame(loop);
+}
+
+async function init() {
+  try {
+    // El detector se carga aparte: si la red falla, la página sigue funcionando y lo dice
+    const { PoseLandmarker, FilesetResolver } = await import(`${MP}/vision_bundle.mjs`);
+    const files = await FilesetResolver.forVisionTasks(`${MP}/wasm`);
+    landmarker = await PoseLandmarker.createFromOptions(files, {
+      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task", delegate: "GPU" },
+      runningMode: "VIDEO", numPoses: 1,
+    });
+    $("status").textContent = "Detector listo";
+  } catch (e) { $("status").textContent = "No se pudo cargar el detector. Revisa la conexión y recarga."; console.error(e); }
+}
+async function startCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) { $("overlayText").textContent = "Este navegador no permite usar la cámara aquí. Ábrelo en Chrome o Safari."; return; }
+  if (!landmarker) { $("overlayText").textContent = "El detector aún está cargando; espera unos segundos."; return; }
+  try {
+    stream?.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = stream; await video.play();
+    $("stage").classList.toggle("mirror", facing === "user");
+    $("overlay").hidden = true; running = true; say("Cámara lista"); loop();
+    try { await navigator.wakeLock?.request("screen"); } catch {}
+  } catch { $("overlayText").textContent = "No se pudo acceder a la cámara. Permite el acceso en el navegador e inténtalo de nuevo."; }
+}
+
+$("startBtn").onclick = startCamera;
+$("camBtn").onclick = () => { facing = facing === "user" ? "environment" : "user"; if (running) startCamera(); };
+$("resetBtn").onclick = () => { coach = createCoach(ficha); renderExercise(); };
+$("voiceBtn").onclick = e => { voice = !voice; e.currentTarget.textContent = `Voz: ${voice ? "sí" : "no"}`; e.currentTarget.setAttribute("aria-pressed", String(voice)); };
+$("exList").onclick = e => {
+  const b = e.target.closest("[data-id]"); if (!b) return;
+  ficha = LIST.find(x => x.id === b.dataset.id); coach = createCoach(ficha); renderExercise();
+  history.replaceState(null, "", `?ex=${ficha.id}`);
+};
+renderExercise();
+init();
+</script>
+</body>
+</html>

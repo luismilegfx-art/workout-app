@@ -28,11 +28,15 @@ export function renderLibrary(view, app) {
         <div class="ex-item">
           <div class="stack" style="gap:2px;min-width:0">
             <button class="ex-name" data-action="toggle" data-id="${e.id}" aria-expanded="${ui.open.has(e.id)}" style="${off.has(e.id) ? "opacity:.5" : ""}">${e.nombre}</button>
-            <span class="ex-meta">${TYPES[e.tipo]} · ${MUSCLES[e.musculo]} · ${LEVELS[e.nivel]} · ${e.lugar === "gym" ? "Solo gimnasio" : "Casa y gimnasio"}${avoid.has(e.id) ? " · evitado por molestia" : ""}${e.movimiento ? " · demostración 3D" : ""}${e.camara ? " · cámara disponible" : ""}</span>
+            <span class="ex-meta">${TYPES[e.tipo]} · ${MUSCLES[e.musculo]} · ${LEVELS[e.nivel]} · ${e.lugar === "gym" ? "Solo gimnasio" : "Casa y gimnasio"}${avoid.has(e.id) ? " · evitado por molestia" : ""}${e.movimiento ? " · demostración 3D" : ""}${e.control?.angulo ? " · cámara" : ""}</span>
           </div>
           <label class="check"><input type="checkbox" id="on-${e.id}" data-id="${e.id}" ${off.has(e.id) ? "" : "checked"}> Activo</label>
         </div>
         ${ui.open.has(e.id) ? techCard(e, { compact: true }) : ""}
+        ${ui.open.has(e.id) && (e.movimiento || e.control?.angulo) ? html`<div class="row" style="margin:6px 0 10px">
+          ${e.movimiento ? html`<a class="btn small" href="prototipos/bot.html?ex=${e.id}">Ver demostración 3D</a>` : ""}
+          ${e.control?.angulo ? html`<a class="btn small" href="prototipos/camara.html?ex=${e.id}">Probar con cámara</a>` : ""}
+        </div>` : ""}
       </li>`)}</ul>
       ${list.length ? "" : html`<div class="empty">Ningún ejercicio coincide con la búsqueda.</div>`}
     </section>
