@@ -217,3 +217,11 @@ test("Fuerza planifica con la duración real de tus series", () => {
   assert.ok(setsOf(slow) <= setsOf(base), `${setsOf(slow)} vs ${setsOf(base)}`);
   assert.ok(Math.abs(slow.totalSec - 45 * 60) / (45 * 60) <= 0.1);
 });
+
+test("condición sin suelo: ni ejercicios, ni calentamiento, ni estiramiento en el suelo", () => {
+  for (const [zonas, enfasis] of [[PRESETS.completo.sel, "masa"], [PRESETS.push.sel, "condicion"], [PRESETS.core.sel, "masa"], [PRESETS.piernas.sel, "fuerza"]]) for (const seed of [1, 2, 3]) {
+    const r = generateRoutine({ minutos: 40, zonas, lugar: "casa", equipo: ["corporal", "mancuernas"], maxEquipos: Infinity, enfasis, seed, condiciones: { sinSuelo: true } }, settings);
+    const ids = [...r.calentamiento, ...r.bloques.flatMap(b => b.ejercicios), ...r.estiramiento];
+    for (const id of ids) assert.ok(!EXERCISE_BY_ID[id].suelo, `${enfasis} ${seed}: ${id}`);
+  }
+});

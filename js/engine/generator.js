@@ -23,8 +23,9 @@ function weightedPick(items, weightOf, rng) {
   for (let i = 0; i < items.length; i++) { r -= ws[i]; if (r <= 0) return items[i]; }
   return items[items.length - 1];
 }
-function usable(e, equip, settings) {
-  return e.equipo.every(q => equip.has(q)) && !settings.desactivados.includes(e.id) && !settings.evitar.includes(e.id);
+function usable(e, equip, settings, cond = {}) {
+  return e.equipo.every(q => equip.has(q)) && !settings.desactivados.includes(e.id) && !settings.evitar.includes(e.id)
+    && !(cond.sinSuelo && e.suelo);
 }
 function recentIds(history) {
   const ids = new Set();
@@ -235,7 +236,7 @@ function groupByGear(ids) {
 // Calentamiento y estiramiento: primero los de los músculos trabajados, luego los de la zona del cuerpo,
 // luego los generales; si hacen falta más, se repiten antes de usar ejercicios de otra zona.
 function pickAuxiliary(tipo, zona, n, ctx, rng, musculos) {
-  const list = EXERCISES.filter(e => e.tipo === tipo && !ctx.settings.desactivados.includes(e.id));
+  const list = EXERCISES.filter(e => e.tipo === tipo && !ctx.settings.desactivados.includes(e.id) && !(ctx.cond?.sinSuelo && e.suelo));
   const shuffle = arr => arr.map(v => [rng(), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
   const byMuscle = shuffle(list.filter(e => musculos.includes(e.musculo) && (e.zona === zona || e.zona === "completo" || zona === "completo")));
   const byZone = shuffle(list.filter(e => e.zona === zona && !musculos.includes(e.musculo)));
@@ -271,7 +272,8 @@ export function generateRoutine(req, settings, history = []) {
   const workSec = Math.max(60, totalSec - PREP_SEC - warm.sec - cool.sec);
 
   const equip = new Set(req.equipo ?? equipmentFor(req.lugar, settings, req.preset));
-  const pool = EXERCISES.filter(e => e.tipo === "principal" && e.sub && usable(e, equip, settings));
+  const cond = req.condiciones ?? {};       // condiciones de hoy (por ejemplo, sin ejercicios en el suelo)
+  const pool = EXERCISES.filter(e => e.tipo === "principal" && e.sub && usable(e, equip, settings, cond));
 
   let units = normalizeTargets(req).filter(u => pool.some(e => e.sub?.startsWith(u.zona + ".")));
   if (!units.length) units = [{ zona: "abdomen", subs: Object.keys(ZONES.abdomen.subs), prio: [] }];
@@ -281,7 +283,7 @@ export function generateRoutine(req, settings, history = []) {
     units = [pickFrom[Math.floor(rng() * pickFrom.length)]];
   }
 
-  const ctx = { settings, pool, used: new Set(), recent: recentIds(history), enfasis, lugar: req.lugar, blockPatterns: new Set(),
+  const ctx = { settings, cond, pool, used: new Set(), recent: recentIds(history), enfasis, lugar: req.lugar, blockPatterns: new Set(),
     selected: new Set(units.flatMap(u => u.subs.map(s => `${u.zona}.${s}`))), gear: new Set(), maxGear: req.maxEquipos ?? p.maxEquipos ?? 3 };
   if (enfasis === "fuerza") return strengthPlan({ req, settings, history, rng, seed, units, equip, pool, ctx, warm, cool, workSec, totalSec, zona: bodyZone(units) });
 
@@ -304,7 +306,7 @@ export function generateRoutine(req, settings, history = []) {
     id: `r-${Date.now().toString(36)}-${seed.toString(36)}`,
     seed, creada: new Date().toISOString(),
     minutos: req.minutos, lugar: req.lugar, preset: req.lugar === "casa" ? (req.preset ?? settings.presetActivo) : null,
-    equipo: [...equip], equipoElegido: req.maxEquipos === Infinity, enfasis, expres,
+    equipo: [...equip], equipoElegido: req.maxEquipos === Infinity, enfasis, expres, condiciones: cond,
     zonas: Object.fromEntries(units.map(u => [u.zona, u.subs])),
     prioridad: units.flatMap(u => u.prio.map(s => `${u.zona}.${s}`)),
     formato: { trabajo: f.trabajo, descanso: f.descanso, descansoRonda: f.descansoRonda },
@@ -414,7 +416,7 @@ function strengthPlan({ req, settings, history, rng, seed, units, equip, pool, c
   const plan = {
     id: `r-${Date.now().toString(36)}-${seed.toString(36)}`, seed, creada: new Date().toISOString(),
     minutos: req.minutos, lugar: req.lugar, preset: req.lugar === "casa" ? (req.preset ?? settings.presetActivo) : null,
-    equipo: [...equip], equipoElegido: req.maxEquipos === Infinity, enfasis: "fuerza", expres: false, modo: "series",
+    equipo: [...equip], equipoElegido: req.maxEquipos === Infinity, enfasis: "fuerza", expres: false, modo: "series", condiciones: req.condiciones ?? {},
     zonas: Object.fromEntries(units.map(u => [u.zona, u.subs])),
     prioridad: units.flatMap(u => u.prio.map(s => `${u.zona}.${s}`)),
     formato: { serie: serieSec, descansoPrincipal: F.descansoPrincipal, descansoAccesorio: F.descansoAccesorio },
@@ -552,7 +554,7 @@ export function swapExercise(plan, oldId, settings) {
   const equip = new Set(plan.equipo ?? equipmentFor(plan.lugar, settings, plan.preset));
   const inPlan = new Set(plan.bloques.flatMap(b => b.ejercicios));
   const old = EXERCISE_BY_ID[oldId];
-  const base = EXERCISES.filter(e => e.tipo === "principal" && !inPlan.has(e.id) && usable(e, equip, settings) && e.nivel <= settings.nivel + 1);
+  const base = EXERCISES.filter(e => e.tipo === "principal" && !inPlan.has(e.id) && usable(e, equip, settings, plan.condiciones) && e.nivel <= settings.nivel + 1);
   const candidates = [base.filter(e => e.sub === old.sub), base.filter(e => e.sub?.startsWith(block.zona + "."))].find(t => t.length);
   if (!candidates) return null;
   const pick = candidates[Math.floor(Math.random() * candidates.length)];

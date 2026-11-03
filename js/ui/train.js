@@ -112,6 +112,10 @@ export function renderTrain(view, app) {
       <section class="card">
         <label class="check"><input type="checkbox" id="opt-warm" ${warmOn ? "checked" : ""}> Calentamiento ${expres ? "(activación breve)" : "dinámico al inicio"}</label>
         <label class="check"><input type="checkbox" id="opt-cool" ${coolOn ? "checked" : ""}> Estiramiento al final</label>
+      </section>
+      <section class="card">
+        <span class="label">Condiciones de hoy</span>
+        <label class="check"><input type="checkbox" id="opt-nofloor" ${req.sinSuelo ? "checked" : ""}> Sin ejercicios en el suelo (ni acostado ni de rodillas)</label>
       </section>`;
   }
 
@@ -153,7 +157,8 @@ export function renderTrain(view, app) {
         const elegir = req.equipoModo === "elegir";
         app.plan = generateRoutine({ minutos: req.minutos, lugar: req.lugar, preset: req.preset, zonas: req.zonas, prioridad: req.prioridad,
           equipo: elegir ? ["corporal", ...req.equipoElegido] : undefined, maxEquipos: elegir ? Infinity : undefined, tiempoSerie: setTimeStats(),
-          enfasis: req.enfasis ?? "masa", calentamiento: req.calentamiento ?? !ex, estiramiento: req.estiramiento ?? !ex }, app.settings, app.history);
+          enfasis: req.enfasis ?? "masa", calentamiento: req.calentamiento ?? !ex, estiramiento: req.estiramiento ?? !ex,
+          condiciones: { sinSuelo: !!req.sinSuelo } }, app.settings, app.history);
         save(req); app.go("rutina"); return;
       }
       default: return;
@@ -163,6 +168,7 @@ export function renderTrain(view, app) {
   view.onchange = e => {
     if (e.target.id === "opt-warm") req.calentamiento = e.target.checked;
     if (e.target.id === "opt-cool") req.estiramiento = e.target.checked;
+    if (e.target.id === "opt-nofloor") req.sinSuelo = e.target.checked;
     save(req);
   };
 }

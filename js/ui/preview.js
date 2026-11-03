@@ -124,7 +124,8 @@ export function renderPreview(view, app) {
         const r = app.request;
         app.plan = generateRoutine({ minutos: plan.minutos, lugar: plan.lugar, preset: plan.preset, zonas: plan.zonas, prioridad: plan.prioridad,
           equipo: plan.equipoElegido ? plan.equipo : undefined, maxEquipos: plan.equipoElegido ? Infinity : undefined, tiempoSerie: setTimeStats(),
-          enfasis: plan.expres ? "masa" : plan.enfasis, calentamiento: plan.calentamiento.length > 0, estiramiento: plan.estiramiento.length > 0 },
+          enfasis: plan.expres ? "masa" : plan.enfasis, calentamiento: plan.calentamiento.length > 0, estiramiento: plan.estiramiento.length > 0,
+          condiciones: plan.condiciones },
           app.settings, app.history);
         if (r) r.step = "enfasis";
         open.clear(); break;

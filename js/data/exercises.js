@@ -25,6 +25,16 @@ function deriveSub(d) {
   }
 }
 
+// Ejercicios que se hacen acostado, sentado, de rodillas o sobre los antebrazos en el suelo.
+// Las flexiones y la plancha alta (solo manos en el suelo) no cuentan. Se usa con la condición "Sin suelo".
+const SUELO = new Set([
+  "rotacion-toracica", "gato-vaca",
+  "flexiones-rodillas", "superman", "y-t-boca-abajo", "puente-gluteo", "puente-una-pierna", "press-suelo-mancuernas", "press-suelo-cerrado",
+  "pullover-suelo", "bird-dog", "plancha", "plancha-lateral", "plancha-copenhague", "crunch", "toques-talones", "bicicleta",
+  "elevacion-piernas", "dead-bug", "hollow-hold", "v-ups", "russian-twist",
+  "est-dorsal", "est-isquios", "est-gluteo", "est-flexor-cadera", "est-cobra", "est-nino",
+]);
+
 function ex(d) {
   const equipo = d.equipo ?? ["corporal"];
   const tipo = d.tipo ?? "principal";
@@ -45,6 +55,7 @@ function ex(d) {
     modo: d.modo ?? "tiempo",
     medida: d.medida ?? "reps",            // reps | tiempo (isométricos y acarreos: se registran pausas)
     unilateral: d.unilateral ?? false,
+    suelo: d.suelo ?? SUELO.has(d.id),     // acostado, sentado o de rodillas en el suelo
     carga: d.carga ?? equipo.some(e => ["barra", "mancuernas", "kettlebell", "maquina", "polea", "balon"].includes(e)),
     tecnica: d.tecnica,
     respiracion: d.respiracion,
