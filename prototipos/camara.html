@@ -161,7 +161,7 @@ function renderExercise() {
   const a = ficha.control.angulo, iso = ficha.medida === "tiempo";
   $("checks").innerHTML = [
     iso ? `Tiempo sostenido con ${a.nombre.toLowerCase()} entre ${a.rango[0]}° y ${a.rango[1]}°` : `Repeticiones completas: ${a.nombre.toLowerCase()} de ${a.rango[1]}° a ${a.rango[0]}°`,
-    ...ficha.control.limites.map(l => l.texto),
+    ...(ficha.control.limites ?? []).map(l => l.texto),
     ...ficha.control.fijas.map(f => f.texto),
     ...(iso ? [] : ["Ritmo: avisa si vas mucho más rápido que el tempo"]),
   ].map(t => `<li>${t}</li>`).join("");
