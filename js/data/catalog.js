@@ -75,7 +75,8 @@ export const DEFAULT_SETTINGS = {
     calentamientoPct: 15, calentamientoMin: 120, calentamientoMax: 480,
     estiramientoPct: 10,  estiramientoMin: 120,  estiramientoMax: 360,
     exprésHasta: 8,        // minutos: hasta aquí la sesión es exprés (una sola zona, sin descanso)
-    pasoCalentamiento: 40, pasoEstiramiento: 30,  // segundos por ejercicio
+    pasoCalentamiento: 40, pasoEstiramiento: 30,  // segundos por ejercicio (mínimo; con más tiempo, cada uno dura más)
+    calentamientoMaxEjercicios: 8, estiramientoMaxEjercicios: 7,   // ejercicios distintos como máximo, sin repetir
     margenTiempo: 5,       // ± % aceptado sobre el tiempo total
     maxEquipos: 3,         // equipos distintos por sesión (el peso corporal no cuenta)
     registroMinDescanso: 15, // segundos: descansos más cortos acumulan el registro hasta uno más largo

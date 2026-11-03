@@ -97,10 +97,39 @@ test("excluye ejercicios marcados por molestias", () => {
   }
 });
 
-test("con pocos bloques entran primero las zonas trabajadas hace más tiempo", () => {
+test("con pocos ejercicios entran primero las zonas trabajadas hace más tiempo", () => {
   const history = [{ zonas: { pecho: ["superior", "medio"], hombros: ["anterior", "lateral"] } }];
   const r = generateRoutine({ minutos: 20, zonas: PRESETS.push.sel, lugar: "casa", enfasis: "masa", seed: 42 }, settings, history);
-  assert.ok(r.bloques.some(b => b.zona === "brazos"), `zonas: ${r.bloques.map(b => b.zona)}`);
+  const subs = r.bloques.flatMap(b => b.ejercicios.map(id => EXERCISE_BY_ID[id].sub));
+  assert.ok(subs.some(s => s.startsWith("brazos.")), `subzonas: ${subs}`);
+});
+
+test("todas las zonas escogidas entran cuando hay ejercicios suficientes (cuerpo completo)", () => {
+  for (const enfasis of ["masa", "condicion"]) for (const seed of [1, 2, 3]) {
+    const r = generateRoutine({ minutos: 45, zonas: PRESETS.completo.sel, lugar: "casa", preset: "casa", enfasis, seed }, settings);
+    const zonas = new Set(r.bloques.flatMap(b => b.ejercicios.map(id => EXERCISE_BY_ID[id].sub.split(".")[0])));
+    for (const z of ["piernas", "espalda", "pecho", "hombros", "abdomen"]) assert.ok(zonas.has(z), `${enfasis} ${seed}: falta ${z}`);
+  }
+});
+
+test("Fuerza usa ejercicios con carga cuando el equipo lo permite", () => {
+  for (const [zonas, lugar] of [[PRESETS.piernas.sel, "casa"], [PRESETS.push.sel, "gym"], [PRESETS.pull.sel, "gym"]]) for (const seed of [1, 2, 3, 4]) {
+    const r = generateRoutine({ minutos: 50, zonas, lugar, preset: "casa", enfasis: "fuerza", seed }, settings);
+    for (const b of r.bloques) {
+      const e = EXERCISE_BY_ID[b.ejercicios[0]];
+      assert.ok(e.carga || e.equipo.includes("dominadas") || e.medida === "tiempo", `${lugar} ${seed}: ${e.id}`);
+    }
+    const main = EXERCISE_BY_ID[r.bloques[0].ejercicios[0]];
+    assert.ok(main.carga && !main.patron.startsWith("aislamiento"), `principal ${main.id}`);
+  }
+});
+
+test("no junta un ejercicio con su variante fácil o difícil en la misma sesión", () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const r = generateRoutine({ minutos: 45, zonas: PRESETS.pull.sel, lugar: "casa", preset: "casa", enfasis: "masa", seed }, settings);
+    const ids = new Set(r.bloques.flatMap(b => b.ejercicios));
+    for (const id of ids) { const e = EXERCISE_BY_ID[id]; assert.ok(!ids.has(e.facil) && !ids.has(e.dificil), `${seed}: ${id}`); }
+  }
 });
 
 test("el calentamiento de piernas no incluye ejercicios de tren superior", () => {
