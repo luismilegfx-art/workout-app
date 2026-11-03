@@ -27,7 +27,7 @@ Proyecto: aplicación de entrenamiento guiado por tiempo, de uso personal (Luism
 
 ## Pendiente
 
-- Integrar la cámara como botón opcional por ejercicio (campo `camara` en la biblioteca) usando `prototipos/prueba-camara-pose.html` como base.
+- Cámara: motor genérico hecho (`js/engine/coach.js`, lee `control` de la ficha; página de prueba `prototipos/camara.html`). Falta integrarla en el reproductor como botón opcional y llenar `control` en más fichas.
 - Progresión: hecha la sugerencia de peso, la calibración inicial y la regla de inactividad (`js/engine/progression.js`, parámetros en `params.progresion`). Faltan recomendaciones de zona y énfasis, descarga y gráficas.
 - Edición completa de ejercicios desde la app.
 - Nombre definitivo de la app.
