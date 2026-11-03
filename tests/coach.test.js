@@ -88,3 +88,22 @@ test("plancha: mide el tiempo sostenido y avisa si la cadera se sale del rango",
   const ev = run(c, [[1.5, { hip: 176 }, { hip: 150 }], [1, { hip: 150 }, { hip: 150 }]]);
   assert.ok(ev.some(e => e.tipo === "aviso"));
 });
+
+test("sentadilla: dejar caer el torso hacia adelante avisa “pecho arriba”", () => {
+  const c = createCoach(E["sentadilla-barra"]);
+  const ev = run(c, [[1.5, { knee: 175, hip: 178 }, { knee: 175, hip: 178 }], [1.5, { knee: 175, hip: 178 }, { knee: 80, hip: 110 }], [1.5, { knee: 80, hip: 110 }, { knee: 175, hip: 178 }]]);
+  assert.ok(ev.some(e => e.tipo === "aviso" && /Pecho arriba/.test(e.texto)), ev.map(e => e.texto).join(" | "));
+});
+
+test("sentadilla: con el torso firme no hay aviso de espalda", () => {
+  const c = createCoach(E["sentadilla-barra"]);
+  const ev = run(c, [[1.5, { knee: 175, hip: 178 }, { knee: 175, hip: 178 }], [1.5, { knee: 175, hip: 178 }, { knee: 80, hip: 150 }], [1.5, { knee: 80, hip: 150 }, { knee: 175, hip: 178 }]]);
+  assert.ok(!ev.some(e => /Pecho arriba/.test(e.texto)));
+});
+
+test("plancha: la cadera que cae dispara el límite de la ficha", () => {
+  const c = createCoach(E["plancha"]);
+  run(c, [[1.5, { hip: 176 }, { hip: 176 }]]);
+  const ev = run(c, [[1, { hip: 176 }, { hip: 160 }], [1, { hip: 160 }, { hip: 160 }]]);
+  assert.ok(ev.some(e => /Cadera arriba/.test(e.texto)), ev.map(e => e.texto).join(" | "));
+});

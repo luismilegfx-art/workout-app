@@ -34,6 +34,11 @@ export function angleAt(a, b, c) {
   return Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / d))) * 180 / Math.PI;
 }
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// Inclinación de un segmento respecto a la vertical (grados); en la imagen y en el mundo de MediaPipe, y apunta hacia abajo
+export function inclination(bottom, top) {
+  const v = [top.x - bottom.x, top.y - bottom.y, (top.z ?? 0) - (bottom.z ?? 0)];
+  return Math.acos(Math.max(-1, Math.min(1, -v[1] / (Math.hypot(...v) || 1)))) * 180 / Math.PI;
+}
 
 /**
  * @param ficha  ficha del ejercicio (js/data/exercises.js)
@@ -54,6 +59,7 @@ export function createCoach(ficha, opts = {}) {
 
   const s = { estado: "esperando", reps: 0, segundos: 0, angulo: null, mensaje: "Colócate de lado, con el cuerpo completo en la imagen" };
   let stableSince = null, stableRef = null, lostSince = null, lastNow = null;
+  const limitSince = new Map(); let isoReset = 0;
   let startEnd = null, phase = "inicio", repStart = 0, farthest = null, repWarn = new Set(), base = null, scale = 1, outSince = null;
 
   const out = (eventos = []) => ({ ...s, rango: ang.rango, nombre: ang.nombre, eventos });
@@ -103,6 +109,23 @@ export function createCoach(ficha, opts = {}) {
       return out(ev);
     }
 
+    // ── Límites de postura (espalda, cadera, balanceo): avisan una vez por repetición si se sostienen 0,3 s ──
+    const geo = frame.world ?? frame.lm;
+    const checkLimites = () => {
+      for (const l of ficha.control.limites ?? []) {
+        if (repWarn.has(l.texto)) continue;
+        const pts = l.puntos.map(n => side === "R" ? mirror(n) : n);
+        if (!pts.every(n => visOf(frame.lm, n) >= P.visibilidad)) continue;
+        const v = l.tipo === "angulo"
+          ? angleAt(point(geo, pts[0]), point(geo, pts[1]), point(geo, pts[2]))
+          : inclination(point(geo, pts[0]), point(geo, pts[1]));
+        const bad = (l.min != null && v < l.min) || (l.max != null && v > l.max);
+        if (!bad) { limitSince.delete(l.texto); continue; }
+        if (!limitSince.has(l.texto)) limitSince.set(l.texto, now);
+        else if (now - limitSince.get(l.texto) >= 300) { repWarn.add(l.texto); say(ev, "aviso", l.texto); }
+      }
+    };
+
     // ── Puntos fijos: avisan una vez por repetición ──
     const checkFijas = () => {
       for (const f of fijas()) {
@@ -115,7 +138,7 @@ export function createCoach(ficha, opts = {}) {
     // ── Isométrico: tiempo dentro del rango ──
     if (iso) {
       const inRange = a >= lo - P.isoTolerancia && a <= hi + P.isoTolerancia;
-      if (inRange) { s.segundos += dt / 1000; outSince = null; s.estado = "sosteniendo"; checkFijas(); }
+      if (inRange) { s.segundos += dt / 1000; outSince = null; s.estado = "sosteniendo"; checkFijas(); checkLimites(); if (now - isoReset > 4000) { repWarn = new Set(); isoReset = now; } }
       else {
         outSince ??= now;
         if (now - outSince > 500 && s.estado !== "fuera") {
@@ -132,7 +155,7 @@ export function createCoach(ficha, opts = {}) {
     if (phase === "inicio" && leftStart) { phase = "moviendo"; repStart = now; farthest = a; repWarn = new Set(); s.estado = "moviendo"; }
     if (phase === "moviendo") {
       farthest = startEnd === "hi" ? Math.min(farthest, a) : Math.max(farthest, a);
-      checkFijas();
+      checkFijas(); checkLimites();
       if (atStart) {
         phase = "inicio"; s.estado = "listo";
         const reached = startEnd === "hi" ? farthest <= lo + span * P.completo : farthest >= hi - span * P.completo;

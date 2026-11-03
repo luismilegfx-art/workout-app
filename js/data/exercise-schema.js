@@ -6,7 +6,10 @@
 //   técnica      tecnica[], respiracion, error
 //   tempo        fases del ciclo: { fase, desde, hasta, dur, resp, cue, esfuerzo }
 //                desde/hasta van de 0 (posición inicial) a 1 (posición final); dur en segundos
-//   control      lo que se mide y se corrige: { angulo, fijas, alineaciones }
+//   control      lo que se mide y se corrige: { angulo, fijas, alineaciones, limites }
+//                limites: reglas de postura que se vigilan todo el tiempo:
+//                  { tipo: "angulo", puntos: [a, b, c], min?, max?, texto }   ángulo en b dentro de un rango
+//                  { tipo: "inclinacion", puntos: [abajo, arriba], max, texto } segmento respecto a la vertical
 //   tension      { articulacion, carga }: la luz del bot se calcula con el brazo de palanca de la carga sobre esa articulación
 //   movimiento   { fuente, modelo, vista, accesorios, trayectoria }: de dónde sale la animación y cómo se presenta
 // Todo lo que no está definido para un ejercicio queda en null o vacío; se va llenando sin tocar código.
@@ -88,6 +91,14 @@ export function validateFicha(e, ctx) {
     for (const f of c.fijas ?? []) {
       if (!(Array.isArray(f.puntos) && f.puntos.length && f.puntos.every(isPunto))) bad("punto fijo inválido");
       if (!isStr(f.texto)) bad("punto fijo sin texto");
+    }
+    for (const l of c.limites ?? []) {
+      if (!["angulo", "inclinacion"].includes(l.tipo)) bad(`límite de tipo desconocido "${l.tipo}"`);
+      const n = l.tipo === "angulo" ? 3 : 2;
+      if (!(Array.isArray(l.puntos) && l.puntos.length === n && l.puntos.every(isPunto))) bad(`límite ${l.tipo} con puntos inválidos`);
+      if (l.min == null && l.max == null) bad("límite sin mínimo ni máximo");
+      for (const k of ["min", "max"]) if (l[k] != null && !(isNum(l[k]) && l[k] >= 0 && l[k] <= 180)) bad(`límite.${k} fuera de 0–180`);
+      if (!isStr(l.texto)) bad("límite sin texto");
     }
     const ids = new Set();
     for (const a of c.alineaciones ?? []) {

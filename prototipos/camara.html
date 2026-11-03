@@ -19,93 +19,140 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
-button { font: inherit; color: inherit; cursor: pointer; }
-.wrap { max-width: 1280px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; }
-@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
-h1 { font-family: var(--display); font-stretch: 75%; font-weight: 800; text-transform: uppercase; font-size: clamp(1.8rem, 5vw, 2.6rem); line-height: .95; margin: 0; }
+button, a { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left));
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; }
+@media (max-width: 960px) { .wrap { grid-template-columns: 1fr; } }
+.main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-stretch: 75%; font-weight: 800; text-transform: uppercase; font-size: clamp(2rem, 5vw, 2.8rem); line-height: .92; margin: 2px 0 0; }
 .label { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.muted { color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: .92rem; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: .92rem; min-height: 40px; }
 .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.stage { position: relative; background: #000; border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 9; }
-@media (max-width: 600px) { .stage { aspect-ratio: 3 / 4; } }
+
+/* Escenario */
+.stage { position: relative; background: var(--stage-bg, #000); border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 9; isolation: isolate; }
+@media (max-width: 640px) { .stage { aspect-ratio: 3 / 4; } }
 .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .stage.mirror video, .stage.mirror canvas { transform: scaleX(-1); }
-.hud { position: absolute; left: 0; right: 0; top: 0; padding: 14px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none;
-  background: linear-gradient(rgb(0 0 0 / .55), transparent); color: #fff; }
-.count { font-family: var(--display); font-stretch: 75%; font-weight: 800; font-size: clamp(4.5rem, 14vw, 9rem); line-height: .8; font-variant-numeric: tabular-nums; }
-.count small { font-size: .3em; letter-spacing: .1em; margin-left: 6px; opacity: .8; }
-.state { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .85rem; padding: 4px 10px; border-radius: 4px; background: var(--accent); color: var(--accent-fg); }
-.state.wait { background: rgb(255 255 255 / .2); color: #fff; }
-.state.bad { background: var(--warn); color: #fff; }
-.msg { position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgb(0 0 0 / .62); color: #fff; border-radius: 10px; padding: 12px 14px;
-  font-size: clamp(1.05rem, 3.2vw, 1.5rem); font-weight: 700; line-height: 1.25; border-left: 4px solid var(--accent); }
-.msg.warn { border-left-color: var(--warn); }
-.angle { position: absolute; right: 16px; bottom: 84px; background: rgb(0 0 0 / .62); color: #fff; border-radius: 10px; padding: 8px 12px; min-width: 180px; }
-.angle b { font-family: var(--display); font-stretch: 75%; font-size: 1.8rem; font-variant-numeric: tabular-nums; }
-.bar { position: relative; height: 6px; background: rgb(255 255 255 / .25); border-radius: 3px; margin-top: 6px; }
-.bar i { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 3px; }
-.bar u { position: absolute; top: -4px; width: 3px; height: 14px; background: #fff; border-radius: 2px; }
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: #fff; background: rgb(0 0 0 / .6); }
-.overlay p { max-width: 420px; margin: 0 0 16px; }
-.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 18px; border-radius: 8px; font-weight: 600; min-height: 44px; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-family: var(--display); font-stretch: 75%; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; font-size: 1.25rem; padding: 12px 26px; }
-.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.stage[data-view="silueta"] video, .stage[data-view="esqueleto"] video { visibility: hidden; }
+.hud { position: absolute; inset: 0 0 auto; padding: 16px 18px 40px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none;
+  background: linear-gradient(rgb(0 0 0 / .5), transparent); color: #fff; }
+.count { font-family: var(--display); font-stretch: 75%; font-weight: 800; font-size: clamp(5rem, 15vw, 10rem); line-height: .78; font-variant-numeric: tabular-nums; text-shadow: 0 2px 18px rgb(0 0 0 / .35); }
+.count small { font-size: .28em; letter-spacing: .1em; margin-left: 6px; opacity: .8; }
+.count-label { font-size: .75rem; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; opacity: .8; margin-top: 8px; }
+.state { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .8rem; padding: 5px 10px; border-radius: 4px; background: var(--accent); color: var(--accent-fg); }
+.state.wait { background: rgb(255 255 255 / .18); color: #fff; }
+.state.bad { background: #b3261e; color: #fff; }
+.angle { position: absolute; right: 16px; bottom: 92px; background: rgb(10 10 12 / .7); color: #fff; border-radius: 12px; padding: 10px 14px; min-width: 190px; backdrop-filter: blur(6px); }
+.angle .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: .85rem; }
+.angle b { font-family: var(--display); font-stretch: 75%; font-size: 2rem; font-variant-numeric: tabular-nums; line-height: 1; }
+.bar { position: relative; height: 6px; background: rgb(255 255 255 / .2); border-radius: 3px; margin-top: 8px; }
+.bar i { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 3px; opacity: .85; }
+.bar u { position: absolute; top: -4px; width: 3px; height: 14px; background: #fff; border-radius: 2px; transition: left .08s linear; }
+.msg { position: absolute; left: 14px; right: 14px; bottom: 14px; background: rgb(10 10 12 / .72); color: #fff; border-radius: 12px; padding: 12px 16px; backdrop-filter: blur(6px);
+  font-size: clamp(1.05rem, 3vw, 1.5rem); font-weight: 700; line-height: 1.25; border-left: 4px solid var(--accent); }
+.msg.warn { border-left-color: #f07171; }
+.msg.flash { animation: flash .5s ease; }
+@keyframes flash { from { transform: translateY(4px); opacity: .4; } to { transform: none; opacity: 1; } }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: #fff; background: rgb(0 0 0 / .62); z-index: 2; }
+.overlay p { max-width: 440px; margin: 0 0 16px; }
+
+/* Controles */
+.bar-controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 9px 14px; font-weight: 600; min-height: 40px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.sw { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); padding: 0; }
+.sw[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 9px 16px; border-radius: 8px; font-weight: 600; min-height: 40px; text-decoration: none; display: inline-flex; align-items: center; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-family: var(--display); font-stretch: 75%; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; font-size: 1.3rem; padding: 12px 28px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-.card ul { margin: 0; padding-left: 18px; }
-.muted { color: var(--muted); }
-.main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+aside { display: flex; flex-direction: column; gap: 12px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="main">
-    <div class="row" style="justify-content:space-between;align-items:flex-end">
+    <div class="head">
       <div><span class="label">Prueba · Entrenador con cámara</span><h1 id="title">Sentadilla con barra</h1></div>
-      <a class="muted" href="../">Volver a la app</a>
+      <a class="btn" href="../">Volver a la app</a>
     </div>
     <div class="chips" id="exList" role="group" aria-label="Ejercicio"></div>
-    <div class="stage mirror" id="stage">
+
+    <div class="stage mirror" id="stage" data-view="camara">
       <video id="video" playsinline muted></video>
       <canvas id="canvas"></canvas>
       <div class="hud">
-        <div><div class="count" id="count">0</div></div>
+        <div><div class="count" id="count">0</div><div class="count-label" id="countLabel">Repeticiones</div></div>
         <span class="state wait" id="state">Esperando</span>
       </div>
-      <div class="angle" id="angleBox" hidden><span id="angleName">Rodilla</span> <b id="angleVal">—</b><span class="muted" id="angleRange"></span><div class="bar" id="bar"><i id="barRange"></i><u id="barNow"></u></div></div>
+      <div class="angle" id="angleBox" hidden>
+        <div class="top"><span id="angleName">Rodilla</span><b id="angleVal">—</b></div>
+        <div class="bar"><i id="barRange"></i><u id="barNow"></u></div>
+        <div class="top" style="margin-top:6px"><span class="muted" style="color:#bbb">Rango</span><span id="angleRange"></span></div>
+      </div>
       <div class="msg" id="msg">Colócate de lado, con el cuerpo completo en la imagen</div>
-      <div class="overlay" id="overlay"><div><p id="overlayText">Pon el teléfono o la computadora de lado a ti, a 2–3 metros, con el cuerpo completo en la imagen.</p><button class="btn primary" id="startBtn">Encender cámara</button></div></div>
+      <div class="overlay" id="overlay"><div>
+        <p id="overlayText">Pon el teléfono o la computadora de lado a ti, a 2–3 metros, con el cuerpo completo en la imagen.</p>
+        <button class="btn primary" id="startBtn">Encender cámara</button>
+      </div></div>
     </div>
-    <div class="row">
-      <button class="btn" id="resetBtn">Reiniciar conteo</button>
-      <button class="btn" id="voiceBtn" aria-pressed="true">Voz: sí</button>
-      <button class="btn" id="camBtn">Cambiar cámara</button>
-      <span class="muted" id="status">Cargando el detector…</span>
+
+    <div class="bar-controls">
+      <div class="group">
+        <span class="label">Vista</span>
+        <div class="seg" role="group" aria-label="Vista">
+          <button data-view="camara" aria-pressed="true">Cámara</button>
+          <button data-view="silueta" aria-pressed="false">Silueta</button>
+          <button data-view="esqueleto" aria-pressed="false">Solo esqueleto</button>
+        </div>
+        <span class="group" id="bgGroup" hidden>
+          <button class="sw" data-bg="#000000" style="background:#000" aria-label="Fondo negro" aria-pressed="true"></button>
+          <button class="sw" data-bg="#16161a" style="background:#16161a" aria-label="Fondo grafito" aria-pressed="false"></button>
+          <button class="sw" data-bg="#0d1b2a" style="background:#0d1b2a" aria-label="Fondo azul noche" aria-pressed="false"></button>
+          <button class="sw" data-bg="#f2f0eb" style="background:#f2f0eb" aria-label="Fondo porcelana" aria-pressed="false"></button>
+        </span>
+      </div>
+      <div class="group">
+        <button class="btn" id="resetBtn">Reiniciar</button>
+        <button class="btn" id="voiceBtn" aria-pressed="true">Voz: sí</button>
+        <button class="btn" id="camBtn">Cambiar cámara</button>
+      </div>
     </div>
+    <span class="muted" id="status">Cargando el detector…</span>
   </div>
-  <aside class="stack" style="display:flex;flex-direction:column;gap:12px">
+
+  <aside>
     <div class="card"><span class="label">Técnica</span><ul id="tech"></ul><span id="resp"></span></div>
     <div class="card"><span class="label">Lo que revisa la cámara</span><ul id="checks"></ul></div>
     <div class="card"><span class="label">Cómo usarla</span>
-      <span class="muted">De lado es lo ideal; en diagonal también funciona. Quédate quieto un segundo en la posición inicial y empieza. Cuenta la repetición al volver a la posición inicial.</span></div>
+      <span class="muted">De lado es lo ideal; en diagonal también funciona. Quédate quieto un segundo en la posición inicial y empieza. La repetición cuenta al volver a la posición inicial; suena un pitido al instante y luego la voz.</span></div>
   </aside>
 </div>
 
 <script type="module">
-const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 import { EXERCISES } from "../js/data/exercises.js";
 import { PUNTOS } from "../js/data/exercise-schema.js";
 import { createCoach } from "../js/engine/coach.js";
 
+const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const $ = id => document.getElementById(id);
 const video = $("video"), canvas = $("canvas"), g = canvas.getContext("2d");
 const LIST = EXERCISES.filter(e => e.control?.angulo);
 let ficha = LIST.find(e => e.id === new URLSearchParams(location.search).get("ex")) ?? LIST[0];
 let coach = createCoach(ficha), landmarker = null, running = false, voice = true, facing = "user", stream = null;
+let view = "camara", bg = "#000000";
 
-const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-
+// ───── Ficha en pantalla ─────
 function renderExercise() {
   $("title").textContent = ficha.nombre;
   $("exList").innerHTML = LIST.map(e => `<button class="chip" data-id="${e.id}" aria-pressed="${e.id === ficha.id}">${e.nombre}</button>`).join("");
@@ -114,59 +161,156 @@ function renderExercise() {
   const a = ficha.control.angulo, iso = ficha.medida === "tiempo";
   $("checks").innerHTML = [
     iso ? `Tiempo sostenido con ${a.nombre.toLowerCase()} entre ${a.rango[0]}° y ${a.rango[1]}°` : `Repeticiones completas: ${a.nombre.toLowerCase()} de ${a.rango[1]}° a ${a.rango[0]}°`,
+    ...ficha.control.limites.map(l => l.texto),
     ...ficha.control.fijas.map(f => f.texto),
     ...(iso ? [] : ["Ritmo: avisa si vas mucho más rápido que el tempo"]),
   ].map(t => `<li>${t}</li>`).join("");
   $("count").innerHTML = iso ? `0<small>s</small>` : "0";
-  $("angleName").textContent = a.nombre; $("angleRange").textContent = ` · ${a.rango[0]}–${a.rango[1]}°`;
+  $("countLabel").textContent = iso ? "Segundos en posición" : "Repeticiones";
+  $("angleName").textContent = a.nombre; $("angleRange").textContent = `${a.rango[0]}–${a.rango[1]}°`;
   $("barRange").style.left = `${a.rango[0] / 180 * 100}%`; $("barRange").style.width = `${(a.rango[1] - a.rango[0]) / 180 * 100}%`;
   setState("esperando"); setMsg(iso ? "Ponte en posición y quédate quieto un segundo" : "Quédate quieto en la posición inicial", false);
 }
 function setState(estado) {
   const el = $("state");
   el.textContent = { esperando: "Esperando", listo: "Listo", moviendo: "En movimiento", sosteniendo: "Sosteniendo", fuera: "Fuera de posición", perdido: "No te veo" }[estado] ?? estado;
-  el.className = "state " + (["esperando"].includes(estado) ? "wait" : ["fuera", "perdido"].includes(estado) ? "bad" : "");
+  el.className = "state " + (estado === "esperando" ? "wait" : ["fuera", "perdido"].includes(estado) ? "bad" : "");
 }
-function setMsg(text, warn) { const m = $("msg"); m.textContent = text; m.className = "msg" + (warn ? " warn" : ""); }
+let lastMsg = "";
+function setMsg(text, warn) {
+  const m = $("msg");
+  if (text !== lastMsg) { m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); lastMsg = text; }
+  m.textContent = text; m.className = "msg flash" + (warn ? " warn" : "");
+}
 
+// ───── Sonido: pitido inmediato + voz local (sin retraso de red) ─────
+let actx = null, esVoice = null;
+function unlockAudio() {
+  try { actx ??= new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch {}
+  if ("speechSynthesis" in window) {
+    const pick = () => {
+      const vs = speechSynthesis.getVoices().filter(v => v.lang?.toLowerCase().startsWith("es"));
+      esVoice = vs.find(v => v.localService) ?? vs[0] ?? null;    // las voces locales responden al instante
+    };
+    pick(); speechSynthesis.onvoiceschanged = pick;
+    const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u);   // se habilita dentro del toque
+  }
+}
+function beep(kind) {
+  if (!actx) return;
+  const o = actx.createOscillator(), gn = actx.createGain(), t = actx.currentTime;
+  o.type = "sine"; o.frequency.value = kind === "warn" ? 330 : 880;
+  gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.25, t + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t + (kind === "warn" ? 0.25 : 0.12));
+  o.connect(gn).connect(actx.destination); o.start(t); o.stop(t + 0.3);
+}
 let lastSaid = "", lastSaidAt = 0;
-function say(text) {
+function say(text, urgent = false) {
   if (!voice || !("speechSynthesis" in window)) return;
   const now = performance.now();
   if (text === lastSaid && now - lastSaidAt < 3000) return;
   lastSaid = text; lastSaidAt = now;
-  const u = new SpeechSynthesisUtterance(text); u.lang = "es-ES"; u.rate = 1.05;
-  speechSynthesis.cancel(); speechSynthesis.speak(u);
+  if (urgent && speechSynthesis.speaking) speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text); u.lang = esVoice?.lang ?? "es-ES"; if (esVoice) u.voice = esVoice; u.rate = 1.15;
+  speechSynthesis.speak(u);
 }
 
+// ───── Dibujo: esqueleto completo, con cabeza, manos y pies ─────
+const mirrorName = n => n.replace(/L$/, "§").replace(/R$/, "L").replace(/§$/, "R");
 function pt(lm, name) {
   const i = PUNTOS[name];
   if (!Array.isArray(i)) return lm[i];
-  return { x: (lm[i[0]].x + lm[i[1]].x) / 2, y: (lm[i[0]].y + lm[i[1]].y) / 2 };
+  const ps = i.map(k => lm[k]);
+  return { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length, visibility: Math.min(...ps.map(p => p.visibility ?? 1)) };
 }
-const mirrorName = n => n.replace(/L$/, "§").replace(/R$/, "L").replace(/§$/, "R");
-function draw(lm, side) {
-  const w = canvas.width, h = canvas.height;
-  g.clearRect(0, 0, w, h);
-  g.lineCap = "round"; g.lineWidth = Math.max(3, w / 220); g.strokeStyle = "rgba(255,255,255,.75)";
-  for (const [a, b] of BONES) {
-    if ((lm[a].visibility ?? 1) < .4 || (lm[b].visibility ?? 1) < .4) continue;
-    g.beginPath(); g.moveTo(lm[a].x * w, lm[a].y * h); g.lineTo(lm[b].x * w, lm[b].y * h); g.stroke();
+const LIMBS = [[11,13],[13,15],[12,14],[14,16],[23,25],[25,27],[24,26],[26,28]];
+const EXTREMITIES = [[15,17],[15,19],[15,21],[17,19],[16,18],[16,20],[16,22],[18,20],[27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];
+let maskCanvas = null, maskCtx = null, maskImg = null;
+function palette() {
+  const light = view !== "camara" && bg === "#f2f0eb";
+  const cs = getComputedStyle(document.documentElement);
+  return {
+    bone: light ? "#16161a" : "#f5f3ee", fill: light ? "rgba(22,22,26,.08)" : "rgba(245,243,238,.10)",
+    sil: light ? [210, 205, 196] : [58, 58, 66], glow: light ? "rgba(0,0,0,0)" : "rgba(255,255,255,.35)",
+    accent: cs.getPropertyValue("--accent").trim() || "#ff6a2b", hold: light ? "#2e4a5f" : "#8db3cf",
+  };
+}
+function drawSilhouette(mask) {
+  const w = mask.width, h = mask.height, data = mask.getAsFloat32Array();
+  if (!maskCanvas || maskCanvas.width !== w || maskCanvas.height !== h) {
+    maskCanvas = new OffscreenCanvas(w, h); maskCtx = maskCanvas.getContext("2d"); maskImg = maskCtx.createImageData(w, h);
   }
-  // Ángulo medido: en el color de acento
+  const [r, gg, b] = palette().sil, px = maskImg.data;
+  for (let i = 0, j = 0; i < data.length; i++, j += 4) {
+    const a = data[i];
+    px[j] = r; px[j + 1] = gg; px[j + 2] = b; px[j + 3] = a > 0.5 ? 235 : a > 0.3 ? (a - 0.3) * 1175 : 0;
+  }
+  maskCtx.putImageData(maskImg, 0, 0);
+  g.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
+}
+function draw(lm, side) {
+  const w = canvas.width, h = canvas.height, k = Math.max(w, h) / 1000, C = palette();
+  const P = i => ({ x: lm[i].x * w, y: lm[i].y * h, v: lm[i].visibility ?? 1 });
+  const vis = (...is) => is.every(i => (lm[i].visibility ?? 1) > 0.4);
+  const line = (a, b, width) => { g.lineWidth = width; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); };
+  g.lineCap = "round"; g.lineJoin = "round";
+
+  // Torso: placa translúcida entre hombros y caderas
+  if (vis(11, 12, 23, 24)) {
+    const q = [P(11), P(12), P(24), P(23)];
+    g.fillStyle = C.fill; g.beginPath(); q.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill();
+  }
+  g.strokeStyle = C.bone; g.shadowColor = C.glow; g.shadowBlur = 10 * k;
+  if (vis(11, 12)) line(P(11), P(12), 7 * k);
+  if (vis(23, 24)) line(P(23), P(24), 7 * k);
+  if (vis(11, 23)) line(P(11), P(23), 5 * k);
+  if (vis(12, 24)) line(P(12), P(24), 5 * k);
+  for (const [a, b] of LIMBS) if (vis(a, b)) line(P(a), P(b), 8 * k);
+  for (const [a, b] of EXTREMITIES) if (vis(a, b)) line(P(a), P(b), 3.5 * k);
+
+  // Cuello y cabeza: elipse orientada con las orejas y la nariz
+  if (vis(11, 12, 0)) {
+    const sh = { x: (P(11).x + P(12).x) / 2, y: (P(11).y + P(12).y) / 2 };
+    const ears = vis(7, 8) ? { x: (P(7).x + P(8).x) / 2, y: (P(7).y + P(8).y) / 2 } : P(0);
+    const earW = vis(7, 8) ? Math.hypot(P(7).x - P(8).x, P(7).y - P(8).y) : 0;
+    const shW = Math.hypot(P(11).x - P(12).x, P(11).y - P(12).y);
+    const torso = vis(23, 24) ? Math.hypot(sh.x - (P(23).x + P(24).x) / 2, sh.y - (P(23).y + P(24).y) / 2) : shW * 2;
+    const r = Math.max(earW * 0.75, shW * 0.24, torso * 0.2, 14 * k);    // proporción de cabeza aunque se vea de lado o de espaldas
+    const nose = P(0), cx = ears.x * 0.7 + nose.x * 0.3, cy = ears.y * 0.7 + nose.y * 0.3 - r * 0.15;
+    const ang = Math.atan2(cy - sh.y, cx - sh.x);
+    const nb = { x: cx - Math.cos(ang) * r * 1.05, y: cy - Math.sin(ang) * r * 1.05 };
+    line(sh, nb, 6 * k);
+    g.lineWidth = 5 * k; g.fillStyle = C.fill;
+    g.beginPath(); g.ellipse(cx, cy, r * 0.88, r * 1.1, ang + Math.PI / 2, 0, Math.PI * 2); g.fill(); g.stroke();
+    // dirección de la mirada: un trazo corto hacia la nariz
+    g.lineWidth = 3 * k; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + (nose.x - cx) * 1.15, cy + (nose.y - cy) * 1.15); g.stroke();
+  }
+  g.shadowBlur = 0;
+  // Articulaciones
+  g.fillStyle = C.bone;
+  for (const i of [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) if (vis(i)) { const p = P(i); g.beginPath(); g.arc(p.x, p.y, 5.5 * k, 0, Math.PI * 2); g.fill(); }
+
+  // Ángulo que se mide: en color de acento, con su arco
   const names = ficha.control.angulo.puntos.map(n => side === "R" ? mirrorName(n) : n);
-  const [p0, p1, p2] = names.map(n => pt(lm, n));
-  g.strokeStyle = css("--accent") || "#ff6a2b"; g.lineWidth = Math.max(6, w / 120);
-  g.beginPath(); g.moveTo(p0.x * w, p0.y * h); g.lineTo(p1.x * w, p1.y * h); g.lineTo(p2.x * w, p2.y * h); g.stroke();
-  g.fillStyle = "#fff"; g.beginPath(); g.arc(p1.x * w, p1.y * h, Math.max(7, w / 110), 0, Math.PI * 2); g.fill();
-  // Puntos que no deben moverse: anillo frío, discreto
-  g.strokeStyle = css("--hold") || "#8db3cf"; g.lineWidth = Math.max(2, w / 300);
+  const [a0, a1, a2] = names.map(n => pt(lm, n));
+  if ([a0, a1, a2].every(p => (p.visibility ?? 1) > 0.4)) {
+    const A = { x: a0.x * w, y: a0.y * h }, B = { x: a1.x * w, y: a1.y * h }, Cc = { x: a2.x * w, y: a2.y * h };
+    g.strokeStyle = C.accent; g.shadowColor = C.accent; g.shadowBlur = 16 * k;
+    g.lineWidth = 10 * k; g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y); g.lineTo(Cc.x, Cc.y); g.stroke();
+    g.shadowBlur = 0;
+    const t1 = Math.atan2(A.y - B.y, A.x - B.x), t2 = Math.atan2(Cc.y - B.y, Cc.x - B.x);
+    let d = t2 - t1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    g.lineWidth = 4 * k; g.globalAlpha = .9; g.beginPath(); g.arc(B.x, B.y, 34 * k, t1, t1 + d, d < 0); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(B.x, B.y, 8 * k, 0, Math.PI * 2); g.fill();
+  }
+  // Puntos que no deben moverse: anillo frío y discreto
+  g.strokeStyle = C.hold; g.lineWidth = 2.5 * k;
   for (const f of ficha.control.fijas) for (const n0 of f.puntos) {
-    const p = pt(lm, side === "R" ? mirrorName(n0) : n0); if (!p) continue;
-    g.beginPath(); g.arc(p.x * w, p.y * h, Math.max(10, w / 70), 0, Math.PI * 2); g.stroke();
+    const p = pt(lm, side === "R" ? mirrorName(n0) : n0); if (!p || (p.visibility ?? 1) < 0.4) continue;
+    g.beginPath(); g.arc(p.x * w, p.y * h, 16 * k, 0, Math.PI * 2); g.stroke();
   }
 }
 
+// ───── Bucle ─────
 let lastT = -1;
 function loop() {
   if (!running) return;
@@ -176,11 +320,16 @@ function loop() {
     const now = performance.now();
     const res = landmarker.detectForVideo(video, now);
     const lm = res.landmarks?.[0];
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    if (view !== "camara") { g.fillStyle = bg; g.fillRect(0, 0, canvas.width, canvas.height); }
+    const mask = res.segmentationMasks?.[0];
+    if (view === "silueta" && mask) drawSilhouette(mask);
+    res.segmentationMasks?.forEach(m => m.close?.());
     const st = coach.update(lm ? { lm, world: res.worldLandmarks?.[0] } : { lm: Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 0 })) }, now);
     if (lm) {
-      const visL = ["hipL", "kneeL", "shoulderL"].reduce((t, n) => t + (pt(lm, n).visibility ?? 0), 0), visR = ["hipR", "kneeR", "shoulderR"].reduce((t, n) => t + (pt(lm, n).visibility ?? 0), 0);
-      draw(lm, visR > visL ? "R" : "L");
-    } else g.clearRect(0, 0, canvas.width, canvas.height);
+      const visSide = s => ["hip", "knee", "shoulder", "elbow"].reduce((t, n) => t + (pt(lm, n + s).visibility ?? 0), 0);
+      draw(lm, visSide("R") > visSide("L") ? "R" : "L");
+    }
     const iso = ficha.medida === "tiempo";
     $("count").innerHTML = iso ? `${Math.floor(st.segundos)}<small>s</small>` : String(st.reps);
     setState(st.estado);
@@ -189,14 +338,18 @@ function loop() {
       $("barNow").style.left = `calc(${Math.min(180, st.angulo) / 180 * 100}% - 1px)`;
     }
     for (const e of st.eventos) {
-      setMsg(e.texto, e.tipo === "aviso" || (e.tipo === "rep" && (!e.completa || e.rapida)));
-      say(e.tipo === "rep" ? e.texto.replace(/^(\d+)\.\s*/, "$1. ") : e.texto);
+      const warn = e.tipo === "aviso" || (e.tipo === "rep" && (!e.completa || e.rapida));
+      setMsg(e.texto, warn);
+      if (e.tipo === "rep") { beep(warn ? "warn" : "ok"); say(e.texto.replace(/^(\d+)\.\s*/, "$1. "), true); }
+      else if (e.tipo === "aviso") { beep("warn"); say(e.texto, true); }
+      else say(e.texto);
     }
-    if (!st.eventos.length && (st.estado === "esperando")) setMsg(st.mensaje, false);
+    if (!st.eventos.length && st.estado === "esperando") setMsg(st.mensaje, false);
   }
   requestAnimationFrame(loop);
 }
 
+// ───── Inicio ─────
 async function init() {
   try {
     // El detector se carga aparte: si la red falla, la página sigue funcionando y lo dice
@@ -204,12 +357,13 @@ async function init() {
     const files = await FilesetResolver.forVisionTasks(`${MP}/wasm`);
     landmarker = await PoseLandmarker.createFromOptions(files, {
       baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task", delegate: "GPU" },
-      runningMode: "VIDEO", numPoses: 1,
+      runningMode: "VIDEO", numPoses: 1, outputSegmentationMasks: true,
     });
     $("status").textContent = "Detector listo";
   } catch (e) { $("status").textContent = "No se pudo cargar el detector. Revisa la conexión y recarga."; console.error(e); }
 }
 async function startCamera() {
+  unlockAudio();
   if (!navigator.mediaDevices?.getUserMedia) { $("overlayText").textContent = "Este navegador no permite usar la cámara aquí. Ábrelo en Chrome o Safari."; return; }
   if (!landmarker) { $("overlayText").textContent = "El detector aún está cargando; espera unos segundos."; return; }
   try {
@@ -217,15 +371,25 @@ async function startCamera() {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
     video.srcObject = stream; await video.play();
     $("stage").classList.toggle("mirror", facing === "user");
-    $("overlay").hidden = true; running = true; say("Cámara lista"); loop();
+    $("overlay").hidden = true; running = true; beep("ok"); say("Cámara lista"); loop();
     try { await navigator.wakeLock?.request("screen"); } catch {}
   } catch { $("overlayText").textContent = "No se pudo acceder a la cámara. Permite el acceso en el navegador e inténtalo de nuevo."; }
+}
+function setView(v) {
+  view = v; $("stage").dataset.view = v;
+  document.querySelectorAll("[data-view]").forEach(b => b.tagName === "BUTTON" && b.setAttribute("aria-pressed", String(b.dataset.view === v)));
+  $("bgGroup").hidden = v === "camara";
+  $("stage").style.setProperty("--stage-bg", v === "camara" ? "#000" : bg);
 }
 
 $("startBtn").onclick = startCamera;
 $("camBtn").onclick = () => { facing = facing === "user" ? "environment" : "user"; if (running) startCamera(); };
 $("resetBtn").onclick = () => { coach = createCoach(ficha); renderExercise(); };
-$("voiceBtn").onclick = e => { voice = !voice; e.currentTarget.textContent = `Voz: ${voice ? "sí" : "no"}`; e.currentTarget.setAttribute("aria-pressed", String(voice)); };
+$("voiceBtn").onclick = e => { voice = !voice; unlockAudio(); e.currentTarget.textContent = `Voz: ${voice ? "sí" : "no"}`; e.currentTarget.setAttribute("aria-pressed", String(voice)); };
+document.querySelectorAll(".seg [data-view]").forEach(b => b.onclick = () => setView(b.dataset.view));
+document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => {
+  bg = b.dataset.bg; document.querySelectorAll("[data-bg]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); setView(view);
+});
 $("exList").onclick = e => {
   const b = e.target.closest("[data-id]"); if (!b) return;
   ficha = LIST.find(x => x.id === b.dataset.id); coach = createCoach(ficha); renderExercise();
@@ -233,6 +397,10 @@ $("exList").onclick = e => {
 };
 renderExercise();
 init();
+// Revisión del dibujo sin cámara: ?debug expone una función que dibuja unos puntos dados
+if (new URLSearchParams(location.search).has("debug")) window.__camDebug = {
+  frame(lm, v = "camara") { setView(v); canvas.width = 1280; canvas.height = 720; g.clearRect(0, 0, 1280, 720); if (view !== "camara") { g.fillStyle = bg; g.fillRect(0, 0, 1280, 720); } draw(lm, "L"); $("overlay").hidden = true; },
+};
 </script>
 </body>
 </html>

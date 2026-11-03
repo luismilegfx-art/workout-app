@@ -52,7 +52,7 @@ function ex(d) {
     camara: d.camara ?? null,               // id de la regla de cámara del prototipo (sentadilla, triceps…); pasa a `control`
     // Demostración y corrección (ver exercise-schema.js)
     tempo: d.tempo ?? null,
-    control: { angulo: d.control?.angulo ?? null, fijas: d.control?.fijas ?? [], alineaciones: d.control?.alineaciones ?? [] },
+    control: { angulo: d.control?.angulo ?? null, fijas: d.control?.fijas ?? [], alineaciones: d.control?.alineaciones ?? [], limites: d.control?.limites ?? [] },
     tension: d.tension ?? null,
     movimiento: d.movimiento ?? null,
     transicion: d.transicion ?? (equipo.includes("barra") ? TRANSICION.barra
@@ -115,6 +115,7 @@ export const EXERCISES = [
     control: {
       angulo: { nombre: "Codo", puntos: ["shoulderL", "elbowL", "wristL"], rango: [60, 180] },
       alineaciones: [{ id: "cuerpo-recto", texto: "Cuerpo en línea recta" }],
+      limites: [{ tipo: "angulo", puntos: ["shoulderL", "hipL", "ankleL"], min: 160, texto: "Cadera alineada: no la dejes caer ni la subas" }],
     },
     tension: { articulacion: "elbowL", carga: "chest" },
     movimiento: { fuente: "manual", modelo: "flexiones", vista: { az: 70, el: 14, radius: 0.95, target: [0, 0.32, 0.72] }, accesorios: ["mat"], trayectoria: "chest" } }),
@@ -233,6 +234,7 @@ export const EXERCISES = [
       angulo: { nombre: "Codo", puntos: ["shoulderL", "elbowL", "wristL"], rango: [45, 170] },
       fijas: [{ puntos: ["elbowL", "elbowR"], texto: "Codos pegados al torso" }],
       alineaciones: [{ id: "codo-bajo-hombro", texto: "El codo no se adelanta" }],
+      limites: [{ tipo: "inclinacion", puntos: ["pelvis", "chest"], max: 15, texto: "Sin balancear el cuerpo" }],
     },
     tension: { articulacion: "elbowL", carga: "handL" },
     movimiento: { fuente: "manual", modelo: "curl-mancuernas", vista: { az: 38, el: 6, radius: 0.98, target: [0, 0.88, 0] }, accesorios: ["dumbbells"], trayectoria: "wristL" } }),
@@ -299,6 +301,7 @@ export const EXERCISES = [
       angulo: { nombre: "Rodilla", puntos: ["hipL", "kneeL", "ankleL"], rango: [65, 178] },
       fijas: [{ puntos: ["heelL", "heelR"], texto: "Talones apoyados" }],
       alineaciones: [{ id: "barra-medio-pie", texto: "Barra sobre el medio del pie" }, { id: "espalda-recta", texto: "Espalda recta" }],
+      limites: [{ tipo: "inclinacion", puntos: ["pelvis", "chest"], max: 50, texto: "Pecho arriba: no dejes caer el torso" }],
     },
     tension: { articulacion: "kneeL", carga: "chest" },
     movimiento: { fuente: "manual", modelo: "sentadilla-barra", vista: { az: 62, el: 8, radius: 1.0, target: [0, 0.86, 0] }, accesorios: ["barbell"], trayectoria: "pelvis" } }),
@@ -326,6 +329,7 @@ export const EXERCISES = [
       angulo: { nombre: "Rodilla", puntos: ["hipL", "kneeL", "ankleL"], rango: [85, 95] },
       fijas: [{ puntos: ["pelvis"], texto: "Espalda pegada a la pared" }, { puntos: ["kneeL"], texto: "Rodillas sobre los tobillos" }],
       alineaciones: [{ id: "rodilla-tobillo", texto: "Rodilla sobre el tobillo" }, { id: "muslo-paralelo", texto: "Muslo paralelo al suelo" }],
+      limites: [{ tipo: "inclinacion", puntos: ["pelvis", "chest"], max: 15, texto: "Espalda pegada a la pared" }],
     },
     tension: { articulacion: "kneeL", carga: "pelvis" },
     movimiento: { fuente: "manual", modelo: "sentadilla-pared", vista: { az: 68, el: 8, radius: 0.85, target: [0, 0.62, 0.05] }, accesorios: ["wall"], trayectoria: null } }),
@@ -441,6 +445,7 @@ export const EXERCISES = [
       angulo: { nombre: "Cadera", puntos: ["shoulderL", "hipL", "kneeL"], rango: [170, 180] },
       fijas: [{ puntos: ["pelvis"], texto: "Cadera quieta: ni arriba ni hundida" }],
       alineaciones: [{ id: "talones-hombros", texto: "Línea recta de talones a hombros" }],
+      limites: [{ tipo: "angulo", puntos: ["shoulderL", "hipL", "ankleL"], min: 165, texto: "Cadera arriba: no la dejes caer" }],
     },
     tension: { articulacion: "hipL", carga: "chest" },
     movimiento: { fuente: "manual", modelo: "plancha", vista: { az: 72, el: 12, radius: 0.92, target: [0, 0.2, 0.68] }, accesorios: ["mat"], trayectoria: null } }),
