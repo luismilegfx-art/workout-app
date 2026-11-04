@@ -64,7 +64,6 @@ export function renderProfile(view, app) {
           <input type="range" id="opt-volumen" min="0.2" max="2.5" step="0.1" value="${s.volumen ?? 1.6}">
         </div>
         <div class="row"><button class="btn small" data-action="test-audio">Probar sonido y voz</button><span class="muted" id="audio-test" aria-live="polite"></span></div>
-        <label class="check"><input type="checkbox" id="opt-uniforme" ${p.descansoUniforme !== false ? "checked" : ""}> Mismo descanso en toda la sesión (entre ejercicios, rondas y cambios de equipo)</label>
       </section>
     </div>
 
@@ -205,7 +204,6 @@ export function renderProfile(view, app) {
     if (t.id === "opt-voz") return app.updateSettings({ voz: t.checked });
     if (t.id === "opt-pitidos") return app.updateSettings({ pitidos: t.checked });
     if (t.id === "opt-volumen") { app.updateSettings({ volumen: Number(t.value) }); unlockAudio(); beep("go"); return; }
-    if (t.id === "opt-uniforme") { app.updateSettings({ params: { ...p, descansoUniforme: t.checked } }); return toast("Guardado"); }
     if (t.id === "metaSemanal") { const n = Number(t.value); if (n >= 1 && n <= 14) { app.updateSettings({ metaSemanal: n }); toast("Guardado"); } return; }
     if (t.id === "import-file" && t.files[0]) {
       try {

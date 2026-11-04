@@ -513,7 +513,7 @@ export function buildSteps(plan, settings) {
   // Descanso uniforme: el mismo tiempo entre ejercicios, entre rondas y en los cambios de equipo
   // (lo que haga falta para cambiar de equipo, si es más que el descanso del formato)
   let uniform = null;
-  if (plan.modo !== "series" && !plan.expres && p.descansoUniforme !== false) {   // exprés sigue sin descanso
+  if (plan.modo !== "series" && !plan.expres) {   // siempre igual (decisión de diseño: simple y sin confusión); exprés sigue sin descanso
     let need = descanso;
     const seq = plan.bloques.flatMap(bl => bl.ejercicios.map(id => EXERCISE_BY_ID[id]));
     plan.bloques.forEach(bl => bl.ejercicios.forEach((id, j) => {
