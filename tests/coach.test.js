@@ -4,7 +4,7 @@ import { createCoach } from "../js/engine/coach.js";
 import { EXERCISE_BY_ID as E } from "../js/data/exercises.js";
 
 // Cuerpo sintético visto de lado (coordenadas de imagen 0–1). Solo se mueve la articulación medida.
-function body({ knee = 175, elbow = 165, hip = 178, heelLift = 0, vis = 1 } = {}) {
+function body({ knee = 175, elbow = 165, hip = 178, heelLift = 0, elbowFwd = 0, vis = 1 } = {}) {
   const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: vis }));
   const set = (i, x, y) => { lm[i] = { x, y, z: 0, visibility: vis }; };
   const r = d => d * Math.PI / 180;
@@ -18,8 +18,8 @@ function body({ knee = 175, elbow = 165, hip = 178, heelLift = 0, vis = 1 } = {}
   for (const [sh, el, wr] of [[11, 13, 15], [12, 14, 16]]) {
     set(sh, hpX + 0.3 * Math.sin(r(180 - hip)), hpY - 0.3 * Math.cos(r(180 - hip)));
     const s = lm[sh];
-    set(el, s.x, s.y + 0.15);
-    set(wr, s.x + 0.15 * Math.sin(r(180 - elbow)), s.y + 0.15 + 0.15 * Math.cos(r(180 - elbow)));
+    set(el, s.x + elbowFwd, s.y + 0.15);
+    set(wr, s.x + elbowFwd + 0.15 * Math.sin(r(180 - elbow)), s.y + 0.15 + 0.15 * Math.cos(r(180 - elbow)));
   }
   return { lm };
 }
@@ -106,4 +106,16 @@ test("plancha: la cadera que cae dispara el límite de la ficha", () => {
   run(c, [[1.5, { hip: 176 }, { hip: 176 }]]);
   const ev = run(c, [[1, { hip: 176 }, { hip: 160 }], [1, { hip: 160 }, { hip: 160 }]]);
   assert.ok(ev.some(e => /Cadera arriba/.test(e.texto)), ev.map(e => e.texto).join(" | "));
+});
+
+test("curl: el codo que se mueve con el cuerpo no dispara el aviso; el que se adelanta sí", () => {
+  const c = createCoach(E["curl-mancuernas"]);
+  const ev = run(c, [[1.5, { elbow: 165 }, { elbow: 165 }], ...reps(3, 3.5, 165, 45, "elbow"), [0.5, { elbow: 165 }, { elbow: 165 }]]);
+  assert.ok(!ev.some(e => /Codos/.test(e.texto)), ev.map(e => e.texto).join(" | "));
+});
+
+test("curl: si el codo se adelanta durante la subida, avisa “Codos pegados al torso”", () => {
+  const c = createCoach(E["curl-mancuernas"]);
+  const ev = run(c, [[1.5, { elbow: 165, elbowFwd: 0 }, { elbow: 165, elbowFwd: 0 }], [1.5, { elbow: 165, elbowFwd: 0 }, { elbow: 50, elbowFwd: 0.12 }], [1.5, { elbow: 50, elbowFwd: 0.12 }, { elbow: 165, elbowFwd: 0 }]]);
+  assert.ok(ev.some(e => /Codos pegados/.test(e.texto)), ev.map(e => e.texto).join(" | "));
 });

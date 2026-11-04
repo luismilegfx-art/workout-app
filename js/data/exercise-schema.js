@@ -91,6 +91,7 @@ export function validateFicha(e, ctx) {
     for (const f of c.fijas ?? []) {
       if (!(Array.isArray(f.puntos) && f.puntos.length && f.puntos.every(isPunto))) bad("punto fijo inválido");
       if (!isStr(f.texto)) bad("punto fijo sin texto");
+      if (f.respecto != null && !isPunto(f.respecto)) bad("punto fijo con referencia inválida");
     }
     for (const l of c.limites ?? []) {
       if (!["angulo", "inclinacion"].includes(l.tipo)) bad(`límite de tipo desconocido "${l.tipo}"`);

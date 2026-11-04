@@ -1,8 +1,11 @@
 // Voz (síntesis en español) y pitidos (Web Audio). Ambos se activan tras el primer toque del usuario.
 
-let audioCtx = null;
+let audioCtx = null, master = null;
 let spanishVoice = null;
-let enabled = { voz: true, pitidos: true };
+let enabled = { voz: true, pitidos: true, volumen: 1.6 };
+// Estado de la voz del navegador: "desconocido" · "ok" · "no-responde" (algunos navegadores la dejan colgada)
+let voiceState = "desconocido";
+export const voiceStatus = () => voiceState;
 
 function loadVoice() {
   if (!("speechSynthesis" in window)) return;
@@ -15,12 +18,22 @@ if ("speechSynthesis" in window) {
   speechSynthesis.addEventListener?.("voiceschanged", loadVoice);
 }
 
-export function configureAudio(opts) { enabled = { ...enabled, ...opts }; }
+export function configureAudio(opts) {
+  enabled = { ...enabled, ...opts };
+  if (master) master.gain.value = enabled.volumen ?? 1.6;
+}
 
 // Llamar desde un toque del usuario (los navegadores bloquean el audio hasta entonces)
 export function unlockAudio() {
   try {
-    audioCtx = audioCtx ?? new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Volumen general con compresor: se puede subir sin que el sonido se rompa
+      const comp = audioCtx.createDynamicsCompressor();
+      comp.threshold.value = -10; comp.ratio.value = 6;
+      master = audioCtx.createGain(); master.gain.value = enabled.volumen ?? 1.6;
+      master.connect(comp).connect(audioCtx.destination);
+    }
     if (audioCtx.state === "suspended") audioCtx.resume();
   } catch { audioCtx = null; }
   if ("speechSynthesis" in window) {           // iOS necesita una primera frase dentro del gesto
@@ -28,14 +41,25 @@ export function unlockAudio() {
   }
 }
 
-export function say(text, { interrupt = true } = {}) {
-  if (!enabled.voz || !("speechSynthesis" in window) || !text) return;
-  if (interrupt) speechSynthesis.cancel();
+export function say(text, { interrupt = true, force = false } = {}) {
+  if ((!enabled.voz && !force) || !("speechSynthesis" in window) || !text) return;
+  // Cancelar solo si está hablando: en Chrome, cancelar justo antes de hablar a veces pierde la frase
+  if (interrupt && speechSynthesis.speaking) speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = spanishVoice?.lang ?? "es-US";
   if (spanishVoice) u.voice = spanishVoice;
   u.rate = 1.05;
+  // Vigilancia: si la frase no empieza en 2 s, la voz del navegador no responde
+  let started = false;
+  u.onstart = () => { started = true; setVoiceState("ok"); };
+  u.onerror = e => { if (e.error !== "interrupted" && e.error !== "canceled") setVoiceState("no-responde"); };
+  setTimeout(() => { if (!started && voiceState !== "ok") setVoiceState("no-responde"); }, 2000);
   speechSynthesis.speak(u);
+}
+function setVoiceState(st) {
+  if (st === voiceState) return;
+  voiceState = st;
+  window.dispatchEvent(new CustomEvent("voz-estado", { detail: st }));
 }
 
 export function stopSpeech() { if ("speechSynthesis" in window) speechSynthesis.cancel(); }
@@ -56,11 +80,11 @@ export function beep(kind = "tick") {
   for (const [freq, at, len, vol] of SOUNDS[kind] ?? SOUNDS.tick) {
     const t = t0 + at;
     const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-    osc.frequency.value = freq; osc.type = "sine";
+    osc.frequency.value = freq; osc.type = "triangle";      // más presencia que una onda pura, sin sonar áspero
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(vol, t + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
-    osc.connect(gain).connect(audioCtx.destination);
+    osc.connect(gain).connect(master ?? audioCtx.destination);
     osc.start(t); osc.stop(t + len + 0.02);
   }
 }

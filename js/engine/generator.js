@@ -510,6 +510,20 @@ export function buildSteps(plan, settings) {
   plan.calentamiento.forEach((id, k) => push({ tipo: "calentamiento", ejercicio: id, duracion: plan.pasoCalentamiento ?? p.pasoCalentamiento,
     fase: "Calentamiento", paso: k + 1, pasos: plan.calentamiento.length, cambioLado: EXERCISE_BY_ID[id]?.unilateral }));
 
+  // Descanso uniforme: el mismo tiempo entre ejercicios, entre rondas y en los cambios de equipo
+  // (lo que haga falta para cambiar de equipo, si es más que el descanso del formato)
+  let uniform = null;
+  if (plan.modo !== "series" && !plan.expres && p.descansoUniforme !== false) {   // exprés sigue sin descanso
+    let need = descanso;
+    const seq = plan.bloques.flatMap(bl => bl.ejercicios.map(id => EXERCISE_BY_ID[id]));
+    plan.bloques.forEach(bl => bl.ejercicios.forEach((id, j) => {
+      const e = EXERCISE_BY_ID[id], n = EXERCISE_BY_ID[bl.ejercicios[(j + 1) % bl.ejercicios.length]];
+      if (n && !sameEquipment(e, n)) need = Math.max(need, n.transicion);
+    }));
+    seq.forEach((e, k) => { const n = seq[k + 1]; if (n && !sameEquipment(e, n)) need = Math.max(need, n.transicion); });
+    uniform = need;
+  }
+
   if (plan.modo === "series") buildSeriesSteps(plan, settings, push);
   else plan.bloques.forEach((bl, b) => {
     for (let r = 0; r < bl.rondas; r++) {
@@ -526,7 +540,7 @@ export function buildSteps(plan, settings) {
         const base = !lastInRound ? descanso : descansoRonda;
         const next = nextId ? EXERCISE_BY_ID[nextId] : null;
         const needsTransition = next && next.tipo === "principal" && !sameEquipment(e, next) ? next.transicion : 0;
-        const dur = Math.max(base, needsTransition);
+        const dur = uniform ?? Math.max(base, needsTransition);
         if (dur <= 0) return;
         const tipo = !lastInRound ? (needsTransition > base ? "transicion" : "descanso")
           : r < bl.rondas - 1 ? "descanso-ronda" : "cambio-bloque";

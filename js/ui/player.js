@@ -49,6 +49,10 @@ export function openPlayer(app) {
   layer.appendChild(root);
   document.body.style.overflow = "hidden";
 
+  // Si la voz del navegador se cuelga, se avisa una vez y la sesión sigue con los pitidos
+  const onVoice = e => { if (e.detail === "no-responde" && root.isConnected) toast("La voz del navegador no responde; siguen los pitidos. Para recuperarla, cierra el navegador por completo y vuelve a abrirlo."); };
+  window.addEventListener("voz-estado", onVoice);
+
   const log = createLog();
   let shown = [];          // intervalos que se están anotando en este descanso
   let started = false, lastIndex = 0;
@@ -177,8 +181,8 @@ export function openPlayer(app) {
                 html`<button class="chip" data-log="pausas" data-i="${i}" data-v="${o.v}" aria-pressed="${x.pausas === o.v}">${o.label}</button>`)}</div>`
             : stepperHTML(i, "reps", x.reps, "reps", `repeticiones de ${e.nombre}`)}
           ${e.carga ? stepperHTML(i, "peso", x.peso, "lb", `peso de ${e.nombre}`) : ""}
-          ${e.carga && x.medida === "reps" ? html`<div class="rirp" role="group" aria-label="Repeticiones que te sobraban en ${e.nombre}">
-            <span class="muted">¿Cuántas más podías?</span>
+          ${e.carga && x.medida === "reps" && sugFor(x.id).estado === "nuevo" ? html`<div class="rirp" role="group" aria-label="Repeticiones que te sobraban en ${e.nombre}">
+            <span class="muted">Calibrando el peso: ¿cuántas más podías?</span>
             ${["0", "1", "2", "3", "4+"].map(v => html`<button class="chip" data-log="rir" data-i="${i}" data-v="${v}" aria-pressed="${String(x.rir) === v}">${v}</button>`)}
           </div>` : ""}
         </div>`;
@@ -287,7 +291,7 @@ export function openPlayer(app) {
     releaseAwake();
     document.removeEventListener("keydown", onKey);
     document.body.style.overflow = "";
-    root.remove();
+    root.remove(); window.removeEventListener("voz-estado", onVoice);
     if (!stats) return;
     app.result = { plan, stats, finished, log };
     app.plan = null;

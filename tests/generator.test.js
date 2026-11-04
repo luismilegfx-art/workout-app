@@ -225,3 +225,11 @@ test("condición sin suelo: ni ejercicios, ni calentamiento, ni estiramiento en 
     for (const id of ids) assert.ok(!EXERCISE_BY_ID[id].suelo, `${enfasis} ${seed}: ${id}`);
   }
 });
+
+test("descanso uniforme: todos los descansos de un circuito duran lo mismo", () => {
+  for (const enfasis of ["masa", "condicion"]) for (const seed of [1, 2, 3, 4]) {
+    const r = generateRoutine({ minutos: 35, zonas: PRESETS.completo.sel, lugar: "casa", preset: "casa", enfasis, seed }, settings);
+    const rests = new Set(r.steps.filter(s => ["descanso", "transicion", "descanso-ronda", "cambio-bloque"].includes(s.tipo)).map(s => s.duracion));
+    assert.ok(rests.size <= 1, `${enfasis} ${seed}: ${[...rests]}`);
+  }
+});

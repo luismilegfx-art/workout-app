@@ -184,9 +184,16 @@ function setMsg(text, warn) {
 }
 
 // ───── Sonido: pitido inmediato + voz local (sin retraso de red) ─────
-let actx = null, esVoice = null;
+let actx = null, master = null, esVoice = null, voiceOk = null;
 function unlockAudio() {
-  try { actx ??= new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch {}
+  try {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      const comp = actx.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 6;
+      master = actx.createGain(); master.gain.value = 1.8; master.connect(comp).connect(actx.destination);
+    }
+    actx.resume();
+  } catch {}
   if ("speechSynthesis" in window) {
     const pick = () => {
       const vs = speechSynthesis.getVoices().filter(v => v.lang?.toLowerCase().startsWith("es"));
@@ -199,9 +206,9 @@ function unlockAudio() {
 function beep(kind) {
   if (!actx) return;
   const o = actx.createOscillator(), gn = actx.createGain(), t = actx.currentTime;
-  o.type = "sine"; o.frequency.value = kind === "warn" ? 330 : 880;
-  gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.25, t + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t + (kind === "warn" ? 0.25 : 0.12));
-  o.connect(gn).connect(actx.destination); o.start(t); o.stop(t + 0.3);
+  o.type = "triangle"; o.frequency.value = kind === "warn" ? 330 : 880;
+  gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.6, t + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t + (kind === "warn" ? 0.25 : 0.12));
+  o.connect(gn).connect(master ?? actx.destination); o.start(t); o.stop(t + 0.3);
 }
 let lastSaid = "", lastSaidAt = 0;
 function say(text, urgent = false) {
@@ -211,6 +218,9 @@ function say(text, urgent = false) {
   lastSaid = text; lastSaidAt = now;
   if (urgent && speechSynthesis.speaking) speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text); u.lang = esVoice?.lang ?? "es-ES"; if (esVoice) u.voice = esVoice; u.rate = 1.15;
+  // Si la voz del navegador no arranca en 2 s, se avisa una vez: los pitidos siguen funcionando
+  let started = false; u.onstart = () => { started = true; voiceOk = true; };
+  setTimeout(() => { if (!started && voiceOk == null) { voiceOk = false; $("status").textContent = "La voz del navegador no responde (siguen los pitidos). Cierra el navegador por completo y vuelve a abrirlo."; } }, 2000);
   speechSynthesis.speak(u);
 }
 
@@ -240,12 +250,14 @@ function drawSilhouette(mask) {
     maskCanvas = new OffscreenCanvas(w, h); maskCtx = maskCanvas.getContext("2d"); maskImg = maskCtx.createImageData(w, h);
   }
   const [r, gg, b] = palette().sil, px = maskImg.data;
+  if (!prevMask || prevMask.length !== data.length) prevMask = new Float32Array(data);
   for (let i = 0, j = 0; i < data.length; i++, j += 4) {
-    const a = data[i];
-    px[j] = r; px[j + 1] = gg; px[j + 2] = b; px[j + 3] = a > 0.5 ? 235 : a > 0.3 ? (a - 0.3) * 1175 : 0;
+    const a = prevMask[i] = prevMask[i] * 0.45 + data[i] * 0.55;          // mezcla con el cuadro anterior: menos parpadeo
+    px[j] = r; px[j + 1] = gg; px[j + 2] = b; px[j + 3] = a > 0.55 ? 235 : a > 0.25 ? (a - 0.25) * 783 : 0;
   }
   maskCtx.putImageData(maskImg, 0, 0);
-  g.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height);
+  g.save(); g.filter = `blur(${Math.max(2, canvas.width / 400)}px)`;            // bordes suaves
+  g.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height); g.restore();
 }
 function draw(lm, side) {
   const w = canvas.width, h = canvas.height, k = Math.max(w, h) / 1000, C = palette();
@@ -311,14 +323,28 @@ function draw(lm, side) {
 }
 
 // ───── Bucle ─────
-let lastT = -1;
+let lastT = -1, proc = null, procCtx = null, smoothLm = null, prevMask = null;
+// Suavizado de los puntos para dibujar: quita el temblor sin retrasar el movimiento
+function smoothLandmarks(lm) {
+  if (!smoothLm || smoothLm.length !== lm.length) { smoothLm = lm.map(p => ({ ...p })); return smoothLm; }
+  smoothLm = lm.map((p, i) => {
+    const q = smoothLm[i], d = Math.hypot(p.x - q.x, p.y - q.y), a = d > 0.04 ? 0.85 : 0.5;   // movimientos grandes pasan rápido
+    return { ...p, x: q.x + a * (p.x - q.x), y: q.y + a * (p.y - q.y) };
+  });
+  return smoothLm;
+}
 function loop() {
   if (!running) return;
   if (video.readyState >= 2 && video.currentTime !== lastT) {
     lastT = video.currentTime;
     if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
     const now = performance.now();
-    const res = landmarker.detectForVideo(video, now);
+    // Se detecta sobre una copia reducida del video: el modelo trabaja a baja resolución y la silueta se procesa más rápido
+    if (!proc) { proc = document.createElement("canvas"); procCtx = proc.getContext("2d", { willReadFrequently: false }); }
+    const pw = 640, ph = Math.round(640 * video.videoHeight / video.videoWidth);
+    if (proc.width !== pw || proc.height !== ph) { proc.width = pw; proc.height = ph; }
+    procCtx.drawImage(video, 0, 0, pw, ph);
+    const res = landmarker.detectForVideo(proc, now);
     const lm = res.landmarks?.[0];
     g.clearRect(0, 0, canvas.width, canvas.height);
     if (view !== "camara") { g.fillStyle = bg; g.fillRect(0, 0, canvas.width, canvas.height); }
@@ -328,7 +354,7 @@ function loop() {
     const st = coach.update(lm ? { lm, world: res.worldLandmarks?.[0] } : { lm: Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 0 })) }, now);
     if (lm) {
       const visSide = s => ["hip", "knee", "shoulder", "elbow"].reduce((t, n) => t + (pt(lm, n + s).visibility ?? 0), 0);
-      draw(lm, visSide("R") > visSide("L") ? "R" : "L");
+      draw(smoothLandmarks(lm), visSide("R") > visSide("L") ? "R" : "L");
     }
     const iso = ficha.medida === "tiempo";
     $("count").innerHTML = iso ? `${Math.floor(st.segundos)}<small>s</small>` : String(st.reps);

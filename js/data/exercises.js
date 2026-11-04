@@ -243,7 +243,7 @@ export const EXERCISES = [
     ],
     control: {
       angulo: { nombre: "Codo", puntos: ["shoulderL", "elbowL", "wristL"], rango: [45, 170] },
-      fijas: [{ puntos: ["elbowL", "elbowR"], texto: "Codos pegados al torso" }],
+      fijas: [{ puntos: ["elbowL", "elbowR"], respecto: "chest", texto: "Codos pegados al torso" }],
       alineaciones: [{ id: "codo-bajo-hombro", texto: "El codo no se adelanta" }],
       limites: [{ tipo: "inclinacion", puntos: ["pelvis", "chest"], max: 15, texto: "Sin balancear el cuerpo" }],
     },

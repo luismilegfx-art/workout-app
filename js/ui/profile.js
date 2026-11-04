@@ -3,6 +3,7 @@ import { html, mount, toast, confirmInPage } from "./dom.js";
 import { EQUIPMENT, EMPHASES, LEVELS } from "../data/catalog.js";
 import { EXERCISE_BY_ID } from "../data/exercises.js";
 import { exportData, importData, resetParams, getSettings } from "../store.js";
+import { unlockAudio, beep, say, voiceStatus } from "../engine/voice.js";
 
 const THEME_KEY = "wa.theme";
 export function applyTheme() {
@@ -58,6 +59,12 @@ export function renderProfile(view, app) {
           html`<button data-action="theme" data-value="${k}" aria-pressed="${theme === k}">${v}</button>`)}</div>
         <label class="check"><input type="checkbox" id="opt-voz" ${s.voz ? "checked" : ""}> Voz guía</label>
         <label class="check"><input type="checkbox" id="opt-pitidos" ${s.pitidos ? "checked" : ""}> Pitidos de cuenta regresiva</label>
+        <div class="field">
+          <label class="label" for="opt-volumen">Volumen de los pitidos</label>
+          <input type="range" id="opt-volumen" min="0.2" max="2.5" step="0.1" value="${s.volumen ?? 1.6}">
+        </div>
+        <div class="row"><button class="btn small" data-action="test-audio">Probar sonido y voz</button><span class="muted" id="audio-test" aria-live="polite"></span></div>
+        <label class="check"><input type="checkbox" id="opt-uniforme" ${p.descansoUniforme !== false ? "checked" : ""}> Mismo descanso en toda la sesión (entre ejercicios, rondas y cambios de equipo)</label>
       </section>
     </div>
 
@@ -147,6 +154,17 @@ export function renderProfile(view, app) {
     const t = e.target.closest("[data-action]"); if (!t) return;
     const v = t.dataset.value;
     switch (t.dataset.action) {
+      case "test-audio": {
+        // Pitido inmediato y una frase; a los 2,5 s se informa si la voz del navegador respondió
+        const out = view.querySelector("#audio-test");
+        unlockAudio(); beep("go"); say("Prueba de voz. Tres, dos, uno.", { force: true });
+        out.textContent = "Probando…";
+        setTimeout(() => {
+          out.textContent = voiceStatus() === "ok" ? "La voz funciona."
+            : "El pitido sonó, pero la voz del navegador no responde. Cierra el navegador por completo y vuelve a abrirlo.";
+        }, 2500);
+        return;
+      }
       case "level": app.updateSettings({ nivel: Number(v) }); break;
       case "goal": {
         const set = new Set(s.objetivos); set.has(v) ? set.delete(v) : set.add(v);
@@ -181,10 +199,13 @@ export function renderProfile(view, app) {
     renderProfile(view, app);
   };
 
+  view.oninput = e => { if (e.target.id === "opt-volumen") app.updateSettings({ volumen: Number(e.target.value) }); };
   view.onchange = async e => {
     const t = e.target;
     if (t.id === "opt-voz") return app.updateSettings({ voz: t.checked });
     if (t.id === "opt-pitidos") return app.updateSettings({ pitidos: t.checked });
+    if (t.id === "opt-volumen") { app.updateSettings({ volumen: Number(t.value) }); unlockAudio(); beep("go"); return; }
+    if (t.id === "opt-uniforme") { app.updateSettings({ params: { ...p, descansoUniforme: t.checked } }); return toast("Guardado"); }
     if (t.id === "metaSemanal") { const n = Number(t.value); if (n >= 1 && n <= 14) { app.updateSettings({ metaSemanal: n }); toast("Guardado"); } return; }
     if (t.id === "import-file" && t.files[0]) {
       try {

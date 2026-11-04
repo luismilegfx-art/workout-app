@@ -22,7 +22,7 @@ export const app = {
   updateSettings(patch) {
     this.settings = { ...this.settings, ...patch };
     saveSettings(this.settings);
-    configureAudio({ voz: this.settings.voz, pitidos: this.settings.pitidos });
+    configureAudio({ voz: this.settings.voz, pitidos: this.settings.pitidos, volumen: this.settings.volumen });
   },
   reloadHistory() { this.history = getHistory(); },
   go(route) { if (location.hash === `#${route}`) render(); else location.hash = route; },
@@ -53,6 +53,6 @@ function render() {
   window.scrollTo(0, 0);
 }
 
-configureAudio({ voz: app.settings.voz, pitidos: app.settings.pitidos });
+configureAudio({ voz: app.settings.voz, pitidos: app.settings.pitidos, volumen: app.settings.volumen });
 window.addEventListener("hashchange", render);
 render();

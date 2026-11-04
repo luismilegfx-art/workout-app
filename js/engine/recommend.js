@@ -29,7 +29,7 @@ export function subzoneRecovery(history, now = Date.now()) {
 }
 
 const subsOf = sel => Object.entries(sel).flatMap(([z, subs]) => subs.map(s => `${z}.${s}`));
-const fmtAgo = h => h == null ? "sin trabajar todavía" : h < 36 ? `hace ${Math.round(h)} h` : `hace ${Math.round(h / 24)} días`;
+const fmtAgo = h => h == null ? "sin trabajar todavía" : h < 1 ? "hace un momento" : h < 36 ? `hace ${Math.round(h)} h` : `hace ${Math.round(h / 24)} días`;
 
 function emphasisFor(settings, history) {
   const options = settings.objetivos?.length ? settings.objetivos : ["masa"];

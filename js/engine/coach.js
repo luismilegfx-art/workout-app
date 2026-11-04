@@ -12,7 +12,8 @@ export const COACH_DEFAULTS = {
   perdidoMs: 600,         // tiempo sin verte antes de pausar
   extremo: 0.25,          // fracción del rango que cuenta como "en un extremo"
   completo: 0.2,          // la repetición es completa si llega a esta fracción del extremo lejano
-  fijaMax: 0.18,          // desplazamiento máximo de un punto fijo (en largos de torso)
+  fijaMax: 0.22,          // desplazamiento máximo de un punto fijo (en largos de torso)
+  persistenciaMs: 300,    // un error debe sostenerse este tiempo antes de avisar (evita falsas alarmas por temblor)
   tempoMin: 0.5,          // repetición más rápida que esta fracción del tempo de la ficha → "más lento"
   isoTolerancia: 8,       // grados fuera del rango que se toleran en un isométrico
 };
@@ -59,7 +60,12 @@ export function createCoach(ficha, opts = {}) {
 
   const s = { estado: "esperando", reps: 0, segundos: 0, angulo: null, mensaje: "Colócate de lado, con el cuerpo completo en la imagen" };
   let stableSince = null, stableRef = null, lostSince = null, lastNow = null;
-  const limitSince = new Map(); let isoReset = 0;
+  const limitSince = new Map(), smoothFix = new Map(); let isoReset = 0;
+  // Posición de un punto, relativa a otro si la ficha lo indica (el codo respecto a los hombros se mueve con el cuerpo)
+  const rel = (lm, n, ref) => {
+    const p = point(lm, n); if (!ref) return { x: p.x, y: p.y };
+    const r = point(lm, side === "R" ? mirror(ref) : ref); return { x: p.x - r.x, y: p.y - r.y };
+  };
   let startEnd = null, phase = "inicio", repStart = 0, farthest = null, repWarn = new Set(), base = null, scale = 1, outSince = null;
 
   const out = (eventos = []) => ({ ...s, rango: ang.rango, nombre: ang.nombre, eventos });
@@ -101,7 +107,8 @@ export function createCoach(ficha, opts = {}) {
         if (now - stableSince >= P.listoMs) {
           s.estado = iso ? "sosteniendo" : "listo";
           startEnd = nearHi ? "hi" : "lo"; phase = "inicio";
-          base = Object.fromEntries(fijas().flatMap(f => f.puntos).map(n => [n, { ...point(frame.lm, n) }]));
+          base = Object.fromEntries(fijas().flatMap(f => f.puntos.map(n => [n, rel(frame.lm, n, f.respecto)])));
+          smoothFix.clear();
           scale = dist(point(frame.lm, "chest"), point(frame.lm, "pelvis")) || 0.25;
           say(ev, "listo", iso ? "Sostén la posición" : "Listo, empieza");
         }
@@ -122,7 +129,7 @@ export function createCoach(ficha, opts = {}) {
         const bad = (l.min != null && v < l.min) || (l.max != null && v > l.max);
         if (!bad) { limitSince.delete(l.texto); continue; }
         if (!limitSince.has(l.texto)) limitSince.set(l.texto, now);
-        else if (now - limitSince.get(l.texto) >= 300) { repWarn.add(l.texto); say(ev, "aviso", l.texto); }
+        else if (now - limitSince.get(l.texto) >= P.persistenciaMs) { repWarn.add(l.texto); say(ev, "aviso", l.texto); }
       }
     };
 
@@ -130,8 +137,16 @@ export function createCoach(ficha, opts = {}) {
     const checkFijas = () => {
       for (const f of fijas()) {
         if (repWarn.has(f.texto)) continue;
-        const moved = f.puntos.some(n => base[n] && dist(point(frame.lm, n), base[n]) / scale > P.fijaMax);
-        if (moved) { repWarn.add(f.texto); say(ev, "aviso", f.texto); }
+        const moved = f.puntos.some(n => {
+          if (!base[n]) return false;
+          const cur = rel(frame.lm, n, f.respecto), prev = smoothFix.get(n) ?? cur;
+          const sm = { x: prev.x + 0.5 * (cur.x - prev.x), y: prev.y + 0.5 * (cur.y - prev.y) };
+          smoothFix.set(n, sm);
+          return dist(sm, base[n]) / scale > P.fijaMax;
+        });
+        if (!moved) { limitSince.delete(f.texto); continue; }
+        if (!limitSince.has(f.texto)) limitSince.set(f.texto, now);
+        else if (now - limitSince.get(f.texto) >= P.persistenciaMs) { repWarn.add(f.texto); say(ev, "aviso", f.texto); }
       }
     };
 
