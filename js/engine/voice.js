@@ -1,5 +1,8 @@
 // Voz (síntesis en español) y pitidos (Web Audio). Ambos se activan tras el primer toque del usuario.
 
+import { sayRecorded, unlockVoicePack, loadVoicePack } from "./voicepack.js";
+loadVoicePack();
+
 let audioCtx = null, master = null;
 let spanishVoice = null;
 let enabled = { voz: true, pitidos: true, volumen: 1.6 };
@@ -25,6 +28,7 @@ export function configureAudio(opts) {
 
 // Llamar desde un toque del usuario (los navegadores bloquean el audio hasta entonces)
 export function unlockAudio() {
+  unlockVoicePack();          // dentro del mismo toque: habilita el audio grabado en iPhone
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -42,7 +46,10 @@ export function unlockAudio() {
 }
 
 export function say(text, { interrupt = true, force = false } = {}) {
-  if ((!enabled.voz && !force) || !("speechSynthesis" in window) || !text) return;
+  if ((!enabled.voz && !force) || !text) return;
+  // Primero la voz grabada de la app (suena igual en todos los dispositivos, sin retraso y en silencio del iPhone)
+  if (sayRecorded(text, { interrupt })) { setVoiceState("ok"); return; }
+  if (!("speechSynthesis" in window)) return;
   // Cancelar solo si está hablando: en Chrome, cancelar justo antes de hablar a veces pierde la frase
   if (interrupt && speechSynthesis.speaking) speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);

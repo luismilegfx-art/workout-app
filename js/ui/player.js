@@ -10,6 +10,7 @@ import { createLog, markDone, canLogIn, settle, update, PAUSE_OPTIONS, DEFAULT_R
 import { techCard } from "./technique.js";
 import { lastLogFor } from "../store.js";
 import { suggest } from "../engine/progression.js";
+import { preload as preloadVoice } from "../engine/voicepack.js";
 import { keepAwake, releaseAwake } from "../engine/keep-awake.js";
 
 const STATE = { preparacion: "prep", calentamiento: "aux", estiramiento: "aux", trabajo: "work" };
@@ -52,6 +53,9 @@ export function openPlayer(app) {
   // Si la voz del navegador se cuelga, se avisa una vez y la sesión sigue con los pitidos
   const onVoice = e => { if (e.detail === "no-responde" && root.isConnected) toast("La voz del navegador no responde; siguen los pitidos. Para recuperarla, cierra el navegador por completo y vuelve a abrirlo."); };
   window.addEventListener("voz-estado", onVoice);
+
+  // Los nombres que van a sonar se cargan al empezar, para que la voz no espere
+  preloadVoice([...new Set(plan.steps.filter(x => x.ejercicio).map(x => EXERCISE_BY_ID[x.ejercicio].nombre))]);
 
   const log = createLog();
   let shown = [];          // intervalos que se están anotando en este descanso

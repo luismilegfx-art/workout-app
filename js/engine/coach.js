@@ -176,7 +176,7 @@ export function createCoach(ficha, opts = {}) {
         const reached = startEnd === "hi" ? farthest <= lo + span * P.completo : farthest >= hi - span * P.completo;
         const dur = now - repStart;
         s.reps++;
-        if (!reached) say(ev, "rep", `${s.reps}. Rango incompleto: ${ang.nombre.toLowerCase()} hasta ${startEnd === "hi" ? lo : hi}°`, { n: s.reps, completa: false });
+        if (!reached) say(ev, "rep", `${s.reps}. Rango incompleto: ${ang.nombre.toLowerCase()} hasta ${startEnd === "hi" ? lo : hi}°`, { n: s.reps, completa: false, voz: `${s.reps}. Rango incompleto` });
         else if (repMs && dur < repMs * P.tempoMin) say(ev, "rep", `${s.reps}. Más lento y controlado`, { n: s.reps, completa: true, rapida: true });
         else say(ev, "rep", repWarn.size ? `${s.reps}. ${[...repWarn][0]}` : `${s.reps}`, { n: s.reps, completa: true });
       }

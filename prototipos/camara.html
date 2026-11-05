@@ -143,6 +143,8 @@ aside { display: flex; flex-direction: column; gap: 12px; }
 import { EXERCISES } from "../js/data/exercises.js";
 import { PUNTOS } from "../js/data/exercise-schema.js";
 import { createCoach } from "../js/engine/coach.js";
+import { sayRecorded, unlockVoicePack, loadVoicePack } from "../js/engine/voicepack.js";
+loadVoicePack();
 
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const $ = id => document.getElementById(id);
@@ -186,6 +188,7 @@ function setMsg(text, warn) {
 // ───── Sonido: pitido inmediato + voz local (sin retraso de red) ─────
 let actx = null, master = null, esVoice = null, voiceOk = null;
 function unlockAudio() {
+  unlockVoicePack();
   try {
     if (!actx) {
       actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -216,6 +219,7 @@ function say(text, urgent = false) {
   const now = performance.now();
   if (text === lastSaid && now - lastSaidAt < 3000) return;
   lastSaid = text; lastSaidAt = now;
+  if (sayRecorded(text, { interrupt: urgent })) return;        // voz grabada de la app
   if (urgent && speechSynthesis.speaking) speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text); u.lang = esVoice?.lang ?? "es-ES"; if (esVoice) u.voice = esVoice; u.rate = 1.15;
   // Si la voz del navegador no arranca en 2 s, se avisa una vez: los pitidos siguen funcionando
@@ -366,7 +370,7 @@ function loop() {
     for (const e of st.eventos) {
       const warn = e.tipo === "aviso" || (e.tipo === "rep" && (!e.completa || e.rapida));
       setMsg(e.texto, warn);
-      if (e.tipo === "rep") { beep(warn ? "warn" : "ok"); say(e.texto.replace(/^(\d+)\.\s*/, "$1. "), true); }
+      if (e.tipo === "rep") { beep(warn ? "warn" : "ok"); say(e.voz ?? e.texto, true); }
       else if (e.tipo === "aviso") { beep("warn"); say(e.texto, true); }
       else say(e.texto);
     }

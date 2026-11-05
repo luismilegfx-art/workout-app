@@ -25,6 +25,10 @@ Proyecto: aplicación de entrenamiento guiado por tiempo, de uso personal (Luism
 - Cada ejercicio principal declara su subzona (`sub: "zona.sub"`) en `js/data/exercises.js`; zonas y atajos en `js/data/catalog.js`.
 - La hoja de ruta por fases está en el documento base del Proyecto (pestaña Hoja de ruta).
 
+## Voz
+
+- La app habla con voz grabada (`assets/voz`, voz Piper es_AR-daniela-high) y solo usa la del navegador si falta una frase. Al agregar textos que se dicen (anuncios, nombres de ejercicios, avisos de las fichas), regenerar: `node herramientas/voz/frases.mjs > herramientas/voz/frases.json` y `python3 herramientas/voz/generar.py <modelo.onnx> herramientas/voz/frases.json assets/voz`. `tests/voicepack.test.js` falla si una frase no tiene audio.
+
 ## Pendiente
 
 - Cámara: motor genérico hecho (`js/engine/coach.js`, lee `control` de la ficha; página de prueba `prototipos/camara.html`). Falta integrarla en el reproductor como botón opcional y llenar `control` en más fichas.
